@@ -49,25 +49,16 @@ cat > /usr/share/novnc/index.html <<'EOF'
 <body>Redirecting...</body></html>
 EOF
 
-# Focus-follows-mouse: hovering over IntelliJ gives it focus without needing a click first
-mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
-cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfwm4" version="1.0">
-  <property name="general" type="empty">
-    <property name="focus_model" type="string" value="mouse"/>
-  </property>
-</channel>
-EOF
-
 if ! pgrep -x xfce4-session >/dev/null 2>&1; then
     startxfce4 &
     sleep 5
 fi
 
+# Focus-follows-mouse via xfconf-query (XML file ignored by running xfconfd)
+DISPLAY=:1 xfconf-query -c xfwm4 -p /general/focus_model -n -t string -s "mouse" 2>/dev/null || true
+
 IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
 if [ -n "$IDEA_BIN" ]; then
-    export _JAVA_AWT_WM_NONREPARENTING=1
     nohup "$IDEA_BIN" /workspace/task_tracker >/tmp/idea.log 2>&1 &
     echo "IntelliJ IDEA launched."
 fi
