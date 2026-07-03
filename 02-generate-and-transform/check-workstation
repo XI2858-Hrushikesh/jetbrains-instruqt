@@ -1,0 +1,39 @@
+#!/bin/bash
+# Check script for "Smart Editing with IntelliJ Intentions"
+
+cd /workspace/task_tracker || exit 1
+
+if [ ! -f /tmp/c2-s1 ]; then
+    fail-message "Step 1 not complete. Switch to Terminal and run: echo \"Project: /workspace/task_tracker\" && touch /tmp/c2-s1"
+    exit 1
+fi
+
+if [ ! -f /tmp/c2-s3 ]; then
+    fail-message "Step 3 not complete. Add a docstring to sort_tasks_by_due_date in the IDE, save the file, then run: touch /tmp/c2-s3"
+    exit 1
+fi
+
+if ! python3 -c "from tasks import filter_tasks_by_priority" 2>/dev/null; then
+    fail-message "filter_tasks_by_priority is not yet defined in tasks.py. Return to the IDE Desktop tab, implement the function from the TODO comment (Step 4), and save the file."
+    exit 1
+fi
+
+if ! python3 -c "
+from tasks import filter_tasks_by_priority
+sample = [{'title':'A','priority':'high'},{'title':'B','priority':'low'},{'title':'C','priority':'high'}]
+result = filter_tasks_by_priority(sample, 'high')
+assert isinstance(result, list) and len(result) == 2
+" 2>/dev/null; then
+    fail-message "filter_tasks_by_priority is defined but returns wrong results. It should return tasks whose 'priority' key matches the argument."
+    exit 1
+fi
+
+if [ ! -f /tmp/c2-s5 ]; then
+    fail-message "Step 5 not complete. Run the verification command in the Terminal (Step 5)."
+    exit 1
+fi
+
+if [ ! -f /tmp/c2-s6 ]; then
+    fail-message "Step 6 not complete. Use Find Usages on add_task in the IDE, then run: touch /tmp/c2-s6"
+    exit 1
+fi

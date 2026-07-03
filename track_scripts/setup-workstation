@@ -1,0 +1,35 @@
+#!/bin/bash
+# Track-level setup: waits for KasmVNC and IntelliJ to be ready.
+# Everything is pre-installed in the Docker image — this script
+# only validates the environment before the first challenge starts.
+
+set -euxo pipefail
+
+echo "Waiting for KasmVNC to be ready on port 8080..."
+for i in $(seq 1 60); do
+    if curl -sf --insecure https://localhost:8080 -o /dev/null 2>/dev/null || \
+       curl -sf http://localhost:8080 -o /dev/null 2>/dev/null; then
+        echo "KasmVNC is ready after ${i} attempts."
+        break
+    fi
+    if [ "$i" -eq 60 ]; then
+        echo "ERROR: KasmVNC did not start within 60 seconds."
+        exit 1
+    fi
+    sleep 2
+done
+
+echo "Waiting for IntelliJ IDEA process..."
+for i in $(seq 1 30); do
+    if pgrep -f "idea" >/dev/null 2>&1; then
+        echo "IntelliJ IDEA is running."
+        break
+    fi
+    if [ "$i" -eq 30 ]; then
+        echo "WARNING: IntelliJ IDEA process not detected — it may still be starting."
+    fi
+    sleep 2
+done
+
+echo "Track environment ready."
+exit 0

@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Solve script for "Smart Editing with IntelliJ Intentions"
+#
+# Produces exactly the state the check script expects.
+# Idempotent — safe to run from any intermediate state (partial completion).
+#
+# Act 1: add filter_tasks_by_priority if not already importable
+# Act 2: create a minimal test file if none exists
+# Act 3: add docstring to complete_task if missing
+
+cd /workspace/task_tracker
+
+# Implement filter_tasks_by_priority if not present
+if ! python3 -c "from tasks import filter_tasks_by_priority" 2>/dev/null; then
+    cat >> tasks.py << 'EOF'
+
+
+def filter_tasks_by_priority(tasks, priority):
+    """Return tasks whose priority key matches the given value."""
+    return [t for t in tasks if t.get("priority") == priority]
+EOF
+fi
+
+# Add docstring to sort_tasks_by_due_date if missing
+python3 - << 'PYEOF'
+import re, pathlib, sys
+path = pathlib.Path("/workspace/task_tracker/tasks.py")
+src = path.read_text()
+if re.search(r'def sort_tasks_by_due_date\([^)]*\):\s*"""', src, re.DOTALL):
+    sys.exit(0)
+src_new = re.sub(
+    r'(def sort_tasks_by_due_date\([^)]*\):)([ \t]*\n)',
+    r'\1\2    """Sort a list of task dicts by due_date, placing tasks with no due date last."""\n',
+    src, count=1)
+path.write_text(src_new)
+PYEOF
+
+touch /tmp/c2-s1 /tmp/c2-s3 /tmp/c2-s5 /tmp/c2-s6

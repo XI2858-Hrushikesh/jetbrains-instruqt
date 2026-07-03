@@ -1,0 +1,197 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Challenge-level setup for "Refactoring and Debugging"
+#
+# Prerequisites marked "Provided by: track setup" (KasmVNC, IntelliJ IDEA, sample
+# project, JetBrains account) are verified here but NOT re-installed — they come
+# from track setup.
+#
+# This script provides the following capabilities (marked "Provided by: this challenge"):
+#   - sort_tasks_by_due_date function injected into tasks.py with 'task_list' parameter
+#   - Git repo initialized at /workspace/task_tracker with exactly one initial commit
+#   - Working tree is clean at challenge start
+#   - .explain_done marker absent at challenge start
+#
+# It also handles retry state: resets an already-renamed parameter back to task_list
+# and resets extra commits from a prior attempt.
+
+# ---------------------------------------------------------------------------
+# Verify track-provided prerequisites (soft failures for hot-start sandboxes)
+# ---------------------------------------------------------------------------
+verify() {
+  local desc="$1"; shift
+  if ! "$@" >/dev/null 2>&1; then
+    echo "SETUP VERIFICATION FAILED: ${desc}" >&2
+    echo "  command: $*" >&2
+    exit 1
+  fi
+}
+
+verify "KasmVNC responding on port 8080" \
+  curl -sf --insecure https://localhost:8080 -o /dev/null
+
+verify "IntelliJ IDEA process running" \
+  pgrep -f "idea"
+
+verify "Sample project directory /workspace/task_tracker exists" \
+  test -d /workspace/task_tracker
+
+verify "tasks.py exists in /workspace/task_tracker" \
+  test -f /workspace/task_tracker/tasks.py
+
+# Soft warnings for C2 prerequisites (hot-start sandboxes may have skipped C2)
+if ! python3 -c "from tasks import filter_tasks_by_priority" 2>/dev/null; then
+  echo "WARNING: filter_tasks_by_priority not importable — challenge 2 may not have been completed" >&2
+fi
+
+if ! python3 -c "from tasks import complete_task; assert complete_task.__doc__" 2>/dev/null; then
+  echo "WARNING: complete_task docstring missing — challenge 2 may not have been completed" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# Install git (idempotent; should already be present in the pre-baked image)
+# ---------------------------------------------------------------------------
+if ! command -v git >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get install -y git
+fi
+
+# ---------------------------------------------------------------------------
+# Configure git identity (required for commits; idempotent)
+# ---------------------------------------------------------------------------
+git config --global user.email "learner@instruqt.com"
+git config --global user.name "Instruqt Learner"
+
+# ---------------------------------------------------------------------------
+# Inject sort_tasks_by_due_date into tasks.py (idempotent)
+# Only appends if the function is not already present
+# ---------------------------------------------------------------------------
+if ! grep -q "def sort_tasks_by_due_date" /workspace/task_tracker/tasks.py; then
+  cat >> /workspace/task_tracker/tasks.py << 'STUB'
+
+
+def sort_tasks_by_due_date(task_list, reverse=False):
+    """Sort tasks by their due_date field.
+
+    Args:
+        task_list: List of task dicts, each expected to have a "due_date" key.
+        reverse: If True, sort descending (latest due date first).
+
+    Returns:
+        A new list of task dicts sorted by due_date.
+    """
+    return sorted(
+        task_list,
+        key=lambda t: t.get("due_date", ""),
+        reverse=reverse
+    )
+STUB
+fi
+
+# ---------------------------------------------------------------------------
+# Reset sort_tasks_by_due_date parameter back to task_list if a prior attempt
+# renamed it (handles retry state idempotently)
+# ---------------------------------------------------------------------------
+python3 - << 'PYEOF'
+import re
+import pathlib
+
+path = pathlib.Path("/workspace/task_tracker/tasks.py")
+src = path.read_text()
+
+# Find the sort_tasks_by_due_date function block
+m = re.search(
+    r'(def sort_tasks_by_due_date\()tasks(\b[^)]*\):.*?)(?=\ndef |\Z)',
+    src,
+    re.DOTALL
+)
+if not m:
+    # Parameter is already task_list or function not found — nothing to do
+    import sys
+    sys.exit(0)
+
+# Replace: signature uses 'tasks' -> restore to 'task_list'
+# Also replace all standalone 'tasks' usages in the function body
+block_start = m.start()
+block_end = m.end()
+
+restored_block = m.group(1) + 'task_list' + m.group(2)
+# Replace standalone 'tasks' (not part of another identifier) in the body
+lines = restored_block.split('\n')
+out_lines = [lines[0]]  # def line already fixed above
+for line in lines[1:]:
+    out_lines.append(re.sub(r'\btasks\b', 'task_list', line))
+restored_block = '\n'.join(out_lines)
+
+src_new = src[:block_start] + restored_block + src[block_end:]
+path.write_text(src_new)
+PYEOF
+
+# ---------------------------------------------------------------------------
+# Initialize git repo (idempotent — only if not already a repo)
+# ---------------------------------------------------------------------------
+if ! git -C /workspace/task_tracker rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /workspace/task_tracker init
+  git -C /workspace/task_tracker add .
+  git -C /workspace/task_tracker commit -m "Initial project state (challenges 1 and 2 complete)"
+fi
+
+# ---------------------------------------------------------------------------
+# Reset to the initial commit if extra commits exist from a prior attempt
+# ---------------------------------------------------------------------------
+COMMIT_COUNT=$(git -C /workspace/task_tracker rev-list --count HEAD)
+if [ "$COMMIT_COUNT" -gt 1 ]; then
+  FIRST_COMMIT=$(git -C /workspace/task_tracker rev-list --max-parents=0 HEAD)
+  git -C /workspace/task_tracker reset --hard "$FIRST_COMMIT"
+  git -C /workspace/task_tracker clean -fd
+fi
+
+# ---------------------------------------------------------------------------
+# Remove stale completion artifact
+# ---------------------------------------------------------------------------
+rm -f /workspace/task_tracker/.explain_done
+
+# ---------------------------------------------------------------------------
+# Verification tail: assert every "Provided by: this challenge" capability
+# is functional before the learner starts
+# ---------------------------------------------------------------------------
+
+# sort_tasks_by_due_date is present
+grep -q "def sort_tasks_by_due_date" /workspace/task_tracker/tasks.py || {
+  echo "SETUP ERROR: sort_tasks_by_due_date not injected into tasks.py" >&2
+  exit 1
+}
+
+# sort_tasks_by_due_date uses 'task_list' parameter (learner must rename it)
+grep -q "def sort_tasks_by_due_date(task_list" /workspace/task_tracker/tasks.py || {
+  echo "SETUP ERROR: sort_tasks_by_due_date parameter not restored to task_list" >&2
+  exit 1
+}
+
+# Git repo exists with at least one commit
+git -C /workspace/task_tracker log --oneline -1 >/dev/null 2>&1 || {
+  echo "SETUP ERROR: git repo not initialized at /workspace/task_tracker" >&2
+  exit 1
+}
+
+# Exactly one commit (clean start state)
+FINAL_COUNT=$(git -C /workspace/task_tracker rev-list --count HEAD)
+[ "$FINAL_COUNT" -eq 1 ] || {
+  echo "SETUP ERROR: expected exactly 1 commit, found ${FINAL_COUNT}" >&2
+  exit 1
+}
+
+# No staged changes (clean working tree)
+git -C /workspace/task_tracker diff --cached --quiet || {
+  echo "SETUP ERROR: unexpected staged changes at challenge start" >&2
+  exit 1
+}
+
+# Explanation marker absent (learner must create it)
+[ ! -f /workspace/task_tracker/.explain_done ] || {
+  echo "SETUP ERROR: .explain_done should not exist at challenge start" >&2
+  exit 1
+}
+
+echo "Challenge setup complete."

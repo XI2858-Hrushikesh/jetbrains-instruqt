@@ -1,0 +1,34 @@
+slug: jetbrains-ai-assistant-ide-copy
+id: vsoub0xtejk2
+version: 1.0.0
+title: Get Started with JetBrains IntelliJ IDEA
+teaser: Run IntelliJ IDEA Community in a browser-based sandbox — no install, no account.
+  Open a Python project, use smart Intention Actions to fix and implement code, then
+  refactor with Shift+F6 and step through the debugger.
+description: |-
+  Run IntelliJ IDEA Community Edition in a browser-based sandbox and experience developer productivity hands-on. Open a Python project, run it from the IDE, use Intention Actions (Alt+Enter) to implement a function from a comment and add docstrings, then rename a parameter consistently across a function using Shift+F6 refactoring, set a breakpoint, and step through execution in the debugger. No local install, no JetBrains account, no sign-up required.
+icon: https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg
+level: beginner
+tags:
+- owner-email:tyler@instruqt.com
+- persona:developer
+- product:ai-assistant
+owner: instruqt-support
+developers:
+- hrushikesh@instruqt.com
+show_timer: true
+idle_timeout: 600
+timelimit: 4200
+lab_config:
+  sidebar_enabled: true
+  feedback_recap_enabled: true
+  feedback_tab_enabled: false
+  loadingMessages: true
+  theme:
+    name: modern-dark
+  override_challenge_layout: false
+  hideStopButton: false
+  default_layout: AssignmentRight
+  default_layout_sidebar_size: 40
+checksum: "7756977939472866294"
+enhanced_loading: false

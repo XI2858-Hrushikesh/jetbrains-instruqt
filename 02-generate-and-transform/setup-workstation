@@ -1,0 +1,164 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Challenge-level setup for "Smart Editing with IntelliJ Intentions"
+#
+# Prerequisites marked "Provided by: track setup" (KasmVNC, IntelliJ IDEA, sample project,
+# JetBrains account) are verified here but NOT re-installed — they come from track setup.
+#
+# This script provides the following capabilities (marked "Provided by: this challenge"):
+#   - pytest available in the project environment
+#   - filter_tasks_by_priority comment stub present in tasks.py
+#   - complete_task function exists in tasks.py (without a docstring)
+#   - tests/ directory exists under the project root
+#
+# It also resets learner-generated artifacts from any prior run so the challenge
+# starts from a clean state on every sandbox start.
+
+# ---------------------------------------------------------------------------
+# Verify track-provided prerequisites
+# ---------------------------------------------------------------------------
+verify() {
+  local desc="$1"; shift
+  if ! "$@" >/dev/null 2>&1; then
+    echo "SETUP VERIFICATION FAILED: ${desc}" >&2
+    echo "  command: $*" >&2
+    exit 1
+  fi
+}
+
+verify "KasmVNC responding on port 8080" \
+  curl -sf --insecure https://localhost:8080 -o /dev/null
+
+verify "IntelliJ IDEA process running" \
+  pgrep -f "idea"
+
+verify "Sample project directory /workspace/task_tracker exists" \
+  test -d /workspace/task_tracker
+
+verify "tasks.py exists in /workspace/task_tracker" \
+  test -f /workspace/task_tracker/tasks.py
+
+# Challenge 1 artifact — soft warning for hot-start sandboxes
+if ! test -f /workspace/task_tracker/.ai_chat_done; then
+  echo "WARNING: .ai_chat_done not found — challenge 1 may not have been completed" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# Install pytest (idempotent; the pre-baked image should already have it)
+# ---------------------------------------------------------------------------
+python3 -m pip install pytest --quiet
+
+# ---------------------------------------------------------------------------
+# Inject comment stub for filter_tasks_by_priority (idempotent)
+# Only appends if the identifier is not already present in tasks.py
+# ---------------------------------------------------------------------------
+if ! grep -q "filter_tasks_by_priority" /workspace/task_tracker/tasks.py; then
+  cat >> /workspace/task_tracker/tasks.py << 'STUB'
+
+# TODO: filter_tasks_by_priority(tasks, priority)
+# Given a list of task dicts and a priority string ("high", "medium", or "low"),
+# return only the tasks whose "priority" key matches the given value.
+STUB
+fi
+
+# ---------------------------------------------------------------------------
+# Ensure complete_task stub exists (idempotent)
+# Only appends if the function is not already present in tasks.py
+# ---------------------------------------------------------------------------
+if ! grep -q "def complete_task" /workspace/task_tracker/tasks.py; then
+  cat >> /workspace/task_tracker/tasks.py << 'STUB'
+
+
+def complete_task(tasks, task_id):
+    for task in tasks:
+        if task.get("id") == task_id:
+            task["done"] = True
+            return task
+    return None
+STUB
+fi
+
+# ---------------------------------------------------------------------------
+# Create the tests/ directory (idempotent)
+# ---------------------------------------------------------------------------
+mkdir -p /workspace/task_tracker/tests
+
+# ---------------------------------------------------------------------------
+# Reset learner-generated artifacts from any prior run
+# ---------------------------------------------------------------------------
+
+# Remove any prior filter_tasks_by_priority implementation (preserves the comment stub)
+python3 - << 'PYEOF'
+import re
+import pathlib
+
+path = pathlib.Path("/workspace/task_tracker/tasks.py")
+src = path.read_text()
+src_clean = re.sub(
+    r'\ndef filter_tasks_by_priority\b[^\n]*\n(?:[ \t][^\n]*\n)*',
+    '\n',
+    src
+)
+path.write_text(src_clean)
+PYEOF
+
+# Remove stale test files from prior runs
+rm -f /workspace/task_tracker/tests/test_*.py
+
+# Remove any prior docstring from complete_task
+python3 - << 'PYEOF'
+import re
+import pathlib
+
+path = pathlib.Path("/workspace/task_tracker/tasks.py")
+src = path.read_text()
+src_clean = re.sub(
+    r'(def complete_task\([^)]*\):[ \t]*\n)[ \t]+""".*?"""\n',
+    r'\1',
+    src,
+    flags=re.DOTALL
+)
+path.write_text(src_clean)
+PYEOF
+
+# ---------------------------------------------------------------------------
+# Verification tail: assert every "Provided by: this challenge" capability
+# is functional before the learner starts
+# ---------------------------------------------------------------------------
+
+# pytest is available
+python3 -m pytest --version || {
+  echo "SETUP ERROR: pytest not available after install" >&2
+  exit 1
+}
+
+# Comment stub is present
+grep -q "filter_tasks_by_priority" /workspace/task_tracker/tasks.py || {
+  echo "SETUP ERROR: filter_tasks_by_priority comment stub not found in tasks.py" >&2
+  exit 1
+}
+
+# complete_task function exists
+grep -q "def complete_task" /workspace/task_tracker/tasks.py || {
+  echo "SETUP ERROR: complete_task not found in tasks.py" >&2
+  exit 1
+}
+
+# tests/ directory exists
+test -d /workspace/task_tracker/tests || {
+  echo "SETUP ERROR: tests/ directory not found" >&2
+  exit 1
+}
+
+# filter_tasks_by_priority should NOT be importable yet (learner must implement it)
+if python3 -c "from tasks import filter_tasks_by_priority" 2>/dev/null; then
+  echo "SETUP WARNING: filter_tasks_by_priority is already importable — reset may be incomplete" >&2
+fi
+
+# No stale test files should be present
+if find /workspace/task_tracker/tests -name "test_*.py" 2>/dev/null | grep -q .; then
+  echo "SETUP WARNING: stale test file found in tests/ — reset may be incomplete" >&2
+fi
+
+echo "Challenge setup complete."

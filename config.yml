@@ -1,0 +1,10 @@
+version: "3"
+containers:
+- name: workstation
+  image: hrushikeshkanade/jetbrains-instruqt:latest
+  ports:
+  - 8080
+  memory: 8192
+  cpus: 4
+  environment:
+    DISPLAY: ":1"

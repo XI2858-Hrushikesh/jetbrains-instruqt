@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Solve script for "Refactoring and Debugging"
+#
+# Produces exactly the state the check script expects.
+# Idempotent — safe to run from any intermediate state (partial completion).
+#
+# Act 1: create .explain_done marker if missing
+# Act 2: propagate the rename in sort_tasks_by_due_date if not yet done
+# Act 3: stage tasks.py and commit if no new commit yet
+
+cd /workspace/task_tracker
+
+touch /tmp/c3-s1
+
+# Apply rename task_list -> tasks in sort_tasks_by_due_date
+python3 - << 'PYEOF'
+import re, pathlib, sys
+path = pathlib.Path("tasks.py")
+src = path.read_text()
+m = re.search(r'(def sort_tasks_by_due_date\()task_list(\b[^)]*\):.*?)(?=\ndef |\Z)', src, re.DOTALL)
+if not m:
+    sys.exit(0)
+new_block = m.group(1) + 'tasks' + re.sub(r'\btask_list\b', 'tasks', m.group(2))
+path.write_text(src[:m.start()] + new_block + src[m.end():])
+PYEOF
+
+touch /tmp/c3-s4 /tmp/c3-s6
+
+COMMIT_COUNT=$(git log --oneline 2>/dev/null | wc -l | tr -d ' ')
+if [ "$COMMIT_COUNT" -le 1 ]; then
+    git add tasks.py
+    git commit -m "Rename task_list to tasks in sort_tasks_by_due_date for consistency"
+fi
+
+touch /tmp/c3-s8

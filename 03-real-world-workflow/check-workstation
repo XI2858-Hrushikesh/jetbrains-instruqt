@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Check script for "Refactoring and Debugging"
+
+cd /workspace/task_tracker || exit 1
+
+if [ ! -f /tmp/c3-s1 ]; then
+    fail-message "Step 1 not complete. Run: cd /workspace/task_tracker && git log --oneline && touch /tmp/c3-s1"
+    exit 1
+fi
+
+# Rename check: signature uses 'tasks', no leftover 'task_list' in the function
+if ! grep -q "def sort_tasks_by_due_date(tasks" tasks.py; then
+    fail-message "The rename is not done yet. In the IDE Desktop, click on 'task_list' in the sort_tasks_by_due_date signature, press Shift+F6, type 'tasks', and press Enter. Then save the file."
+    exit 1
+fi
+
+if python3 - << 'PYEOF' 2>/dev/null; then
+import re, sys, pathlib
+src = pathlib.Path("tasks.py").read_text()
+m = re.search(r'def sort_tasks_by_due_date\b.*?(?=\ndef |\Z)', src, re.DOTALL)
+if m and re.search(r'\btask_list\b', m.group(0)):
+    sys.exit(1)
+PYEOF
+    :
+else
+    fail-message "The rename is incomplete — 'task_list' still appears inside sort_tasks_by_due_date. Save the file after Shift+F6 and retry."
+    exit 1
+fi
+
+if ! python3 -c "from tasks import sort_tasks_by_due_date" 2>/dev/null; then
+    fail-message "sort_tasks_by_due_date has a syntax error after the rename. Check tasks.py and fix any remaining issues."
+    exit 1
+fi
+
+if [ ! -f /tmp/c3-s4 ]; then
+    fail-message "Step 4 verification not run. Switch to Terminal and run: python3 -c \"from tasks import sort_tasks_by_due_date; print('rename OK')\" && touch /tmp/c3-s4"
+    exit 1
+fi
+
+if [ ! -f /tmp/c3-s6 ]; then
+    fail-message "Step 6 not complete. Run the debugger on the task_tracker configuration (Shift+F9), step through add_task, then run: touch /tmp/c3-s6"
+    exit 1
+fi
+
+# Commit check
+COMMIT_COUNT=$(git log --oneline 2>/dev/null | wc -l | tr -d ' ')
+if [ "$COMMIT_COUNT" -le 1 ]; then
+    fail-message "No new commit found. Run Step 8: git add tasks.py && git commit -m \"Rename task_list to tasks...\" && touch /tmp/c3-s8"
+    exit 1
+fi
+
+if ! git show --name-only HEAD | grep -q "tasks.py"; then
+    fail-message "The latest commit does not include tasks.py. Stage it first: git add tasks.py"
+    exit 1
+fi
+
+if [ ! -f /tmp/c3-s8 ]; then
+    fail-message "Step 8 marker missing. Run: touch /tmp/c3-s8 after committing."
+    exit 1
+fi

@@ -1,0 +1,5 @@
+#!/bin/bash
+cd /workspace/task_tracker
+python3 tasks.py add "Fix login bug" 2>/dev/null || true
+touch .run_done
+touch /tmp/c1-s5 /tmp/c1-s6
