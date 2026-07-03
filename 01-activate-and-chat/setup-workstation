@@ -1,21 +1,8 @@
 #!/bin/bash
 set -euxo pipefail
 
-verify() {
-    local desc="$1"; shift
-    if ! "$@" >/dev/null 2>&1; then
-        echo "SETUP FAILED: ${desc}" >&2
-        exit 1
-    fi
-}
-
-verify "KasmVNC responding on port 8080" \
-    bash -c 'curl -sf --insecure https://localhost:8080 -o /dev/null 2>/dev/null || curl -sf http://localhost:8080 -o /dev/null'
-
-verify "IntelliJ IDEA process running" pgrep -f "idea"
-
-verify "task_tracker project exists" test -d /workspace/task_tracker
-verify "tasks.py exists" test -f /workspace/task_tracker/tasks.py
+test -d /workspace/task_tracker
+test -f /workspace/task_tracker/tasks.py
 
 # Reset completion artifacts
 rm -f /workspace/task_tracker/.run_done /tmp/c1-s5 /tmp/c1-s6

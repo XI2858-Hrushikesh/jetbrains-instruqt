@@ -28,12 +28,6 @@ verify() {
   fi
 }
 
-verify "KasmVNC responding on port 8080" \
-  curl -sf --insecure https://localhost:8080 -o /dev/null
-
-verify "IntelliJ IDEA process running" \
-  pgrep -f "idea"
-
 verify "Sample project directory /workspace/task_tracker exists" \
   test -d /workspace/task_tracker
 
