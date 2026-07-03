@@ -5,24 +5,21 @@ export DISPLAY=:1
 export HOME=/root
 export XFCE_ALLOW_ROOT=1
 
-# Instruqt provides VNC (port 5900) and noVNC (port 8080) automatically.
-# We just need XFCE and IntelliJ running on display :1.
-
-# Pre-accept IntelliJ EULA, disable data sharing, trust /workspace
 IDEA_CFG="/root/.config/JetBrains/IdeaIC2024.1"
+IDEA_DIR=$(ls -d /opt/idea-IC-*/ 2>/dev/null | head -1)
 mkdir -p "$IDEA_CFG/options" /root/.local/share/JetBrains/consentOptions
 
-# EULA acceptance
-echo "1.0" > "$IDEA_CFG/accepted_eua"
+# EULA — properties format required by IntelliJ 2024.1 (plain "1.0" is wrong)
+printf '[accepted]\neua=1.0\n' > "$IDEA_CFG/accepted_eua"
 
-# Data sharing — decline
-echo "rsch:1.1:0:0" > /root/.local/share/JetBrains/consentOptions/accepted
+# Data sharing consent — real timestamp required (timestamp=0 causes dialog to reappear)
+printf "rsch:1.1:0:%s\n" "$(date +%s%3N)" > /root/.local/share/JetBrains/consentOptions/accepted
 
-# Trust /workspace so no "Trust Project" dialog
+# Trusted paths — correct component name is TrustedPaths (not Trusted.Paths)
 cat > "$IDEA_CFG/options/trusted-paths.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <application>
-  <component name="Trusted.Paths">
+  <component name="TrustedPaths">
     <option name="TRUSTED_PATHS">
       <list>
         <option value="/workspace" />
@@ -32,25 +29,135 @@ cat > "$IDEA_CFG/options/trusted-paths.xml" <<'EOF'
 </application>
 EOF
 
-# Create index.html so Instruqt's iframe loads the VNC viewer automatically
+if [ -n "$IDEA_DIR" ]; then
+    grep -q "ide.firstLaunch" "${IDEA_DIR}bin/idea.properties" 2>/dev/null || \
+        printf "\nide.firstLaunch=false\nidea.privacy.accepted=true\n" >> "${IDEA_DIR}bin/idea.properties"
+    printf -- "-Xmx2048m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n" > "$IDEA_CFG/idea64.vmoptions"
+fi
+
+# Disable codeWithMe plugin — causes EDT crash on first launch in containers
+printf "com.jetbrains.codeWithMe\n" > "$IDEA_CFG/disabled_plugins.txt"
+
+if ! command -v xdotool >/dev/null 2>&1; then
+    apt-get update -q >/tmp/apt-update.log 2>&1 || true
+    apt-get install -y -q xdotool >/tmp/xdotool-install.log 2>&1 || true
+fi
+
 cat > /usr/share/novnc/index.html <<'EOF'
 <!DOCTYPE html>
 <html><head><meta http-equiv="refresh" content="0; url=vnc_auto.html"></head>
 <body>Redirecting...</body></html>
 EOF
 
-# Start XFCE if not already running
+# Focus-follows-mouse: hovering over IntelliJ gives it focus without needing a click first
+mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
+cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="focus_model" type="string" value="mouse"/>
+  </property>
+</channel>
+EOF
+
 if ! pgrep -x xfce4-session >/dev/null 2>&1; then
     startxfce4 &
     sleep 5
 fi
 
-# Launch IntelliJ IDEA
 IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
 if [ -n "$IDEA_BIN" ]; then
+    export _JAVA_AWT_WM_NONREPARENTING=1
     nohup "$IDEA_BIN" /workspace/task_tracker >/tmp/idea.log 2>&1 &
     echo "IntelliJ IDEA launched."
 fi
+
+# Background dialog handler — keyboard-only, NO xdotool mouse clicks.
+# xdotool mousemove/click corrupts x11vnc's button tracking state, freezing VNC input.
+# wmctrl -a activates via EWMH (WM-native, safe); xdotool key sends keystrokes only.
+(
+    export DISPLAY=:1
+
+    wait_for_window() {
+        local title="$1"
+        local timeout="${2:-300}"
+        local elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+            local win
+            win=$(xdotool search --name "$title" 2>/dev/null | head -1) || true
+            if [ -n "$win" ]; then
+                echo "$win"
+                return 0
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+        done
+        return 1
+    }
+
+    # 0. Start Failed — close via WM (30s max)
+    SF_ELAPSED=0
+    while [ $SF_ELAPSED -lt 30 ]; do
+        SF_WIN=$(xdotool search --name "Start Failed" 2>/dev/null | head -1) || true
+        if [ -n "$SF_WIN" ]; then
+            wmctrl -c "Start Failed" 2>/dev/null || true
+            echo "$(date): Start Failed closed" >> /tmp/dialog-handler.log
+            sleep 2; break
+        fi
+        sleep 2; SF_ELAPSED=$((SF_ELAPSED + 2))
+    done
+    [ $SF_ELAPSED -ge 30 ] && echo "$(date): Start Failed not seen (good)" >> /tmp/dialog-handler.log || true
+
+    # 1. Trust and Open Project — focus by ID (wmctrl -a needs exact title, unreliable)
+    WIN=$(wait_for_window "Trust and Open Project" 60) && {
+        xdotool windowactivate "$WIN" 2>/dev/null || true
+        sleep 0.8
+        xdotool key --clearmodifiers Return
+        echo "$(date): Trust dialog: Return pressed (win $WIN)" >> /tmp/dialog-handler.log
+        sleep 3
+    } || echo "$(date): Trust not seen" >> /tmp/dialog-handler.log
+
+    # 2. EULA — mouse clicks on checkbox then Continue button.
+    #    Keyboard tab order is unpredictable (Exit button causes IntelliJ to quit).
+    #    Coordinates confirmed from logs: checkbox at (22,358), Continue at (505,404)
+    #    in a 590x426 dialog. windowraise only — no windowactivate, no focus stealing.
+    WIN=$(wait_for_window "User Agreement" 60) && {
+        xdotool windowraise "$WIN" 2>/dev/null || true
+        sleep 0.8
+        xdotool mousemove --window "$WIN" --clearmodifiers 22 358
+        sleep 0.3
+        xdotool click --clearmodifiers 1
+        sleep 0.5
+        xdotool mousemove --window "$WIN" --clearmodifiers 505 404
+        sleep 0.3
+        xdotool click --clearmodifiers 1
+        echo "$(date): EULA dismissed via mouse (win $WIN)" >> /tmp/dialog-handler.log
+        sleep 2
+    } || echo "$(date): EULA not seen" >> /tmp/dialog-handler.log
+
+    # 3. Data Sharing — WM_DELETE = "Don't Send" (no mouse needed)
+    WIN=$(wait_for_window "Data Sharing" 60) && {
+        xdotool windowclose "$WIN" 2>/dev/null || true
+        echo "$(date): Data Sharing closed" >> /tmp/dialog-handler.log
+    } || echo "$(date): Data Sharing not seen" >> /tmp/dialog-handler.log
+
+    # 4. Restore focus to IntelliJ main window after all dialogs are gone.
+    #    xdotool getactivewindow returned empty after dialog dismissal — IntelliJ has no focus.
+    #    Mouse move (no click) is safe: doesn't touch x11vnc button state.
+    #    Moving to screen center lands inside IntelliJ's window; focus-follows-mouse gives it focus.
+    sleep 2
+    IDEA_WIN=$(xdotool search --class "jetbrains" 2>/dev/null | head -1) || true
+    if [ -n "$IDEA_WIN" ]; then
+        xdotool windowactivate "$IDEA_WIN" 2>/dev/null || true
+        sleep 0.5
+        echo "$(date): activated IntelliJ main window $IDEA_WIN" >> /tmp/dialog-handler.log
+    fi
+    xdotool mousemove 960 540 2>/dev/null || true
+    echo "$(date): mouse moved to center (960,540)" >> /tmp/dialog-handler.log
+
+    echo "$(date): dialog handler complete" >> /tmp/dialog-handler.log
+
+) >> /tmp/dialog-handler.log 2>&1 &
 
 echo "Track environment ready."
 exit 0
