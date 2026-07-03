@@ -139,19 +139,13 @@ fi
         echo "$(date): Data Sharing closed" >> /tmp/dialog-handler.log
     } || echo "$(date): Data Sharing not seen" >> /tmp/dialog-handler.log
 
-    # 4. Restore focus to IntelliJ main window after all dialogs are gone.
-    #    xdotool getactivewindow returned empty after dialog dismissal — IntelliJ has no focus.
-    #    Mouse move (no click) is safe: doesn't touch x11vnc button state.
-    #    Moving to screen center lands inside IntelliJ's window; focus-follows-mouse gives it focus.
+    # 4. Restart x11vnc to clear button state corruption from xdotool mouse clicks.
+    #    noVNC auto-reconnects within 1-2 seconds. New x11vnc has fully clean state.
     sleep 2
-    IDEA_WIN=$(xdotool search --class "jetbrains" 2>/dev/null | head -1) || true
-    if [ -n "$IDEA_WIN" ]; then
-        xdotool windowactivate "$IDEA_WIN" 2>/dev/null || true
-        sleep 0.5
-        echo "$(date): activated IntelliJ main window $IDEA_WIN" >> /tmp/dialog-handler.log
-    fi
-    xdotool mousemove 960 540 2>/dev/null || true
-    echo "$(date): mouse moved to center (960,540)" >> /tmp/dialog-handler.log
+    pkill -f x11vnc 2>/dev/null || true
+    sleep 1
+    DISPLAY=:1 x11vnc -display :1 -forever -nopw -listen 127.0.0.1 -rfbport 5900 -quiet >/dev/null 2>&1 &
+    echo "$(date): x11vnc restarted — clean state" >> /tmp/dialog-handler.log
 
     echo "$(date): dialog handler complete" >> /tmp/dialog-handler.log
 
