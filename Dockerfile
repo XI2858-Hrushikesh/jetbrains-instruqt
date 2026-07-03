@@ -11,18 +11,22 @@ ENV HOME=/root
 ENV USER=root
 ENV DISPLAY=:1
 
-# Base packages + desktop + Java + Python + VNC stack
-RUN apt-get update && apt-get install -y \
+# Enable universe repo (needed for x11vnc) and install packages
+RUN echo "deb http://archive.ubuntu.com/ubuntu jammy universe" >> /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     curl wget git sudo \
     python3 python3-pip \
     openjdk-17-jdk \
     xfce4 xfce4-terminal \
     dbus-x11 x11-utils x11-xserver-utils \
     xvfb x11vnc \
-    novnc python3-websockify \
+    novnc \
     xfonts-base \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Install websockify via pip (more reliable than apt package)
+RUN pip3 install --quiet websockify
 
 # Install IntelliJ IDEA Community
 RUN wget -q \

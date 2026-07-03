@@ -1,9 +1,45 @@
 #!/bin/bash
-# Track-level setup: everything is pre-installed in the Docker image.
-# The desktop (Xvfb + XFCE + noVNC) starts automatically via the container CMD.
-# Allow extra time for IntelliJ to load before the first challenge.
+set -euxo pipefail
 
-sleep 30
+export DISPLAY=:1
+export HOME=/root
+export XFCE_ALLOW_ROOT=1
+
+# Start virtual framebuffer
+Xvfb :1 -screen 0 1920x1080x24 &
+sleep 3
+
+# Start XFCE desktop
+startxfce4 &
+sleep 5
+
+# Start x11vnc (no password, local only)
+x11vnc -display :1 -forever -nopw -listen 127.0.0.1 -rfbport 5900 -quiet &
+sleep 2
+
+# Start noVNC websocket proxy on port 8080
+NOVNC_WEB=/usr/share/novnc
+python3 -m websockify --web="$NOVNC_WEB" 8080 127.0.0.1:5900 &
+
+echo "Waiting for noVNC on port 8080..."
+for i in $(seq 1 60); do
+    if curl -sf http://localhost:8080 -o /dev/null 2>/dev/null; then
+        echo "Desktop ready after ${i} attempts."
+        break
+    fi
+    if [ "$i" -eq 60 ]; then
+        echo "ERROR: Desktop did not start within 120 seconds."
+        exit 1
+    fi
+    sleep 2
+done
+
+# Launch IntelliJ IDEA in background
+IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
+if [ -n "$IDEA_BIN" ]; then
+    nohup "$IDEA_BIN" /workspace/task_tracker >/tmp/idea.log 2>&1 &
+    echo "IntelliJ IDEA launched."
+fi
 
 echo "Track environment ready."
 exit 0
