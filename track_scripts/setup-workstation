@@ -1,40 +1,9 @@
 #!/bin/bash
-# Track-level setup: waits for KasmVNC and IntelliJ to be ready.
-# Everything is pre-installed in the Docker image — this script
-# only validates the environment before the first challenge starts.
+# Track-level setup: everything is pre-installed in the Docker image.
+# The desktop (Xvfb + XFCE + noVNC) starts automatically via the container CMD.
+# Allow extra time for IntelliJ to load before the first challenge.
 
-set -euxo pipefail
-
-echo "Waiting for KasmVNC to be ready on port 8080..."
-for i in $(seq 1 150); do
-    if curl -sf http://localhost:8080 -o /dev/null 2>/dev/null; then
-        echo "KasmVNC is ready after ${i} attempts."
-        break
-    fi
-    if [ "$i" -eq 150 ]; then
-        echo "ERROR: KasmVNC did not start within 300 seconds."
-        echo "--- vncserver log ---"
-        cat /tmp/vncserver.log 2>/dev/null || echo "(no log)"
-        echo "--- processes ---"
-        ps aux | grep -E "vnc|xfce|idea" || true
-        echo "--- port 8080 ---"
-        ss -tlnp 2>/dev/null | grep 8080 || true
-        exit 1
-    fi
-    sleep 2
-done
-
-echo "Waiting for IntelliJ IDEA process..."
-for i in $(seq 1 30); do
-    if pgrep -f "idea" >/dev/null 2>&1; then
-        echo "IntelliJ IDEA is running."
-        break
-    fi
-    if [ "$i" -eq 30 ]; then
-        echo "WARNING: IntelliJ IDEA process not detected — it may still be starting."
-    fi
-    sleep 2
-done
+sleep 30
 
 echo "Track environment ready."
 exit 0
