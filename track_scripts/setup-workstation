@@ -8,6 +8,13 @@ export XFCE_ALLOW_ROOT=1
 # Instruqt provides VNC (port 5900) and noVNC (port 8080) automatically.
 # We just need XFCE and IntelliJ running on display :1.
 
+# Create index.html so Instruqt's iframe loads the VNC viewer automatically
+cat > /usr/share/novnc/index.html <<'EOF'
+<!DOCTYPE html>
+<html><head><meta http-equiv="refresh" content="0; url=vnc_auto.html"></head>
+<body>Redirecting...</body></html>
+EOF
+
 # Start XFCE if not already running
 if ! pgrep -x xfce4-session >/dev/null 2>&1; then
     startxfce4 &
