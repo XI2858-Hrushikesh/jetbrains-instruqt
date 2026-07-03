@@ -5,15 +5,22 @@ export DISPLAY=:1
 export HOME=/root
 export XFCE_ALLOW_ROOT=1
 
-# Start virtual framebuffer
-Xvfb :1 -screen 0 1920x1080x24 &
-sleep 3
+# Install VNC tools if not present (Instruqt provides display :1)
+if ! command -v x11vnc >/dev/null 2>&1; then
+    echo "deb http://archive.ubuntu.com/ubuntu jammy universe" >> /etc/apt/sources.list
+    apt-get update -qq
+    apt-get install -y -qq x11vnc
+fi
 
-# Start XFCE desktop
+if ! python3 -c "import websockify" 2>/dev/null; then
+    pip3 install --quiet websockify
+fi
+
+# Start XFCE desktop on the existing display :1
 startxfce4 &
 sleep 5
 
-# Start x11vnc (no password, local only)
+# Start x11vnc to capture display :1
 x11vnc -display :1 -forever -nopw -listen 127.0.0.1 -rfbport 5900 -quiet &
 sleep 2
 
