@@ -23,6 +23,7 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu jammy universe" >> /etc/apt/sourc
     novnc \
     xfonts-base \
     ca-certificates \
+    xdotool wmctrl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install websockify via pip (more reliable than apt package)
