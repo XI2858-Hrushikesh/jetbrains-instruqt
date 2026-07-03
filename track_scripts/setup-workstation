@@ -117,21 +117,17 @@ fi
         sleep 3
     } || echo "$(date): Trust not seen" >> /tmp/dialog-handler.log
 
-    # 2. EULA — mouse clicks on checkbox then Continue button.
-    #    Keyboard tab order is unpredictable (Exit button causes IntelliJ to quit).
-    #    Coordinates confirmed from logs: checkbox at (22,358), Continue at (505,404)
-    #    in a 590x426 dialog. windowraise only — no windowactivate, no focus stealing.
+    # 2. EULA — keyboard only (no mouse clicks — they corrupt x11vnc button state).
+    #    IntelliJ opens this dialog with the Accept checkbox focused by default.
+    #    Space checks the checkbox → Continue button enables → Return activates it.
+    #    No Tab: Tab moves focus to Exit button, pressing Enter then quits IntelliJ.
     WIN=$(wait_for_window "User Agreement" 60) && {
-        xdotool windowraise "$WIN" 2>/dev/null || true
+        xdotool windowactivate "$WIN" 2>/dev/null || true
         sleep 0.8
-        xdotool mousemove --window "$WIN" --clearmodifiers 22 358
-        sleep 0.3
-        xdotool click --clearmodifiers 1
+        xdotool key --clearmodifiers space
         sleep 0.5
-        xdotool mousemove --window "$WIN" --clearmodifiers 505 404
-        sleep 0.3
-        xdotool click --clearmodifiers 1
-        echo "$(date): EULA dismissed via mouse (win $WIN)" >> /tmp/dialog-handler.log
+        xdotool key --clearmodifiers Return
+        echo "$(date): EULA dismissed via keyboard space+Return (win $WIN)" >> /tmp/dialog-handler.log
         sleep 2
     } || echo "$(date): EULA not seen" >> /tmp/dialog-handler.log
 
