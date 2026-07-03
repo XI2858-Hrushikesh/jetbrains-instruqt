@@ -114,17 +114,22 @@ fi
         sleep 3
     } || echo "$(date): Trust not seen" >> /tmp/dialog-handler.log
 
-    # 2. EULA — keyboard only (no mouse clicks — they corrupt x11vnc button state).
-    #    IntelliJ opens this dialog with the Accept checkbox focused by default.
-    #    Space checks the checkbox → Continue button enables → Return activates it.
-    #    No Tab: Tab moves focus to Exit button, pressing Enter then quits IntelliJ.
+    # 2. EULA — mouse clicks on checkbox then Continue button.
+    #    Focus starts on text pane (not checkbox), so keyboard Space+Return doesn't work.
+    #    _JAVA_AWT_WM_NONREPARENTING=1 removed so xfwm4 manages IntelliJ windows
+    #    normally; any transient x11vnc state from these clicks is fixed by the first
+    #    real user click, which now properly gives IntelliJ focus via click-to-focus.
     WIN=$(wait_for_window "User Agreement" 60) && {
-        xdotool windowactivate "$WIN" 2>/dev/null || true
+        xdotool windowraise "$WIN" 2>/dev/null || true
         sleep 0.8
-        xdotool key --clearmodifiers space
+        xdotool mousemove --window "$WIN" --clearmodifiers 22 358
+        sleep 0.3
+        xdotool click --clearmodifiers 1
         sleep 0.5
-        xdotool key --clearmodifiers Return
-        echo "$(date): EULA dismissed via keyboard space+Return (win $WIN)" >> /tmp/dialog-handler.log
+        xdotool mousemove --window "$WIN" --clearmodifiers 505 404
+        sleep 0.3
+        xdotool click --clearmodifiers 1
+        echo "$(date): EULA dismissed via mouse (win $WIN)" >> /tmp/dialog-handler.log
         sleep 2
     } || echo "$(date): EULA not seen" >> /tmp/dialog-handler.log
 
