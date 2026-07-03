@@ -8,6 +8,30 @@ export XFCE_ALLOW_ROOT=1
 # Instruqt provides VNC (port 5900) and noVNC (port 8080) automatically.
 # We just need XFCE and IntelliJ running on display :1.
 
+# Pre-accept IntelliJ EULA, disable data sharing, trust /workspace
+IDEA_CFG="/root/.config/JetBrains/IdeaIC2024.1"
+mkdir -p "$IDEA_CFG/options" /root/.local/share/JetBrains/consentOptions
+
+# EULA acceptance
+echo "1.0" > "$IDEA_CFG/accepted_eua"
+
+# Data sharing — decline
+echo "rsch:1.1:0:0" > /root/.local/share/JetBrains/consentOptions/accepted
+
+# Trust /workspace so no "Trust Project" dialog
+cat > "$IDEA_CFG/options/trusted-paths.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<application>
+  <component name="Trusted.Paths">
+    <option name="TRUSTED_PATHS">
+      <list>
+        <option value="/workspace" />
+      </list>
+    </option>
+  </component>
+</application>
+EOF
+
 # Create index.html so Instruqt's iframe loads the VNC viewer automatically
 cat > /usr/share/novnc/index.html <<'EOF'
 <!DOCTYPE html>
