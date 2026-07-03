@@ -6,31 +6,23 @@ FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG IDEA_VERSION=2024.1.7
-ARG KASM_VERSION=1.3.1
 
 ENV HOME=/root
 ENV USER=root
 ENV DISPLAY=:1
 
-# Base packages + desktop + Java + Python
+# Base packages + desktop + Java + Python + VNC stack
 RUN apt-get update && apt-get install -y \
-    curl wget git sudo openssl \
+    curl wget git sudo \
     python3 python3-pip \
     openjdk-17-jdk \
-    xfce4 xfce4-terminal xfce4-screensaver \
+    xfce4 xfce4-terminal \
     dbus-x11 x11-utils x11-xserver-utils \
+    xvfb x11vnc \
+    novnc python3-websockify \
     xfonts-base \
-    libgbm1 libxkbcommon0 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# Install KasmVNC (Ubuntu 22.04 / jammy)
-RUN wget -q \
-    "https://github.com/kasmtech/KasmVNC/releases/download/v${KASM_VERSION}/kasmvncserver_jammy_${KASM_VERSION}_amd64.deb" \
-    -O /tmp/kasmvnc.deb && \
-    apt-get update && apt-get install -y /tmp/kasmvnc.deb && \
-    rm /tmp/kasmvnc.deb && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install IntelliJ IDEA Community
 RUN wget -q \
