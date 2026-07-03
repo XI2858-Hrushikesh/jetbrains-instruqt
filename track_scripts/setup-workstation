@@ -54,8 +54,14 @@ if ! pgrep -x xfce4-session >/dev/null 2>&1; then
     sleep 5
 fi
 
-# Focus-follows-mouse via xfconf-query (XML file ignored by running xfconfd)
-DISPLAY=:1 xfconf-query -c xfwm4 -p /general/focus_model -n -t string -s "mouse" 2>/dev/null || true
+# Focus-follows-mouse: xfconf-query needs the D-Bus session bus address from xfce4-session
+XFCE_PID=$(pgrep -x xfce4-session | head -1) || true
+if [ -n "$XFCE_PID" ]; then
+    DBUS_ADDR=$(grep -z DBUS_SESSION_BUS_ADDRESS /proc/"$XFCE_PID"/environ 2>/dev/null | tr '\0' '\n' | grep DBUS_SESSION_BUS_ADDRESS | cut -d= -f2-) || true
+    if [ -n "$DBUS_ADDR" ]; then
+        DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR" DISPLAY=:1 xfconf-query -c xfwm4 -p /general/focus_model -n -t string -s "mouse" 2>/dev/null || true
+    fi
+fi
 
 IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
 if [ -n "$IDEA_BIN" ]; then
