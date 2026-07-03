@@ -17,11 +17,11 @@ RUN apt-get update && apt-get install -y \
     curl wget git sudo openssl \
     python3 python3-pip \
     openjdk-17-jdk \
-    xfce4 xfce4-terminal xfce4-screensaver \
-    dbus-x11 x11-utils xdpyinfo \
-    xfonts-base xfonts-100dpi xfonts-75dpi \
+    xfce4 xfce4-terminal \
+    dbus-x11 x11-utils \
+    xfonts-base \
     libgbm1 libxkbcommon0 \
-    ca-certificates ssl-cert \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install KasmVNC (Ubuntu 22.04 / jammy)
