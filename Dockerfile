@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y \
     curl wget git sudo openssl \
     python3 python3-pip \
     openjdk-17-jdk \
-    xfce4 xfce4-terminal \
-    dbus-x11 x11-utils \
+    xfce4 xfce4-terminal xfce4-screensaver \
+    dbus-x11 x11-utils x11-xserver-utils \
     xfonts-base \
     libgbm1 libxkbcommon0 \
     ca-certificates \

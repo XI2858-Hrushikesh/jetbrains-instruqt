@@ -6,14 +6,20 @@
 set -euxo pipefail
 
 echo "Waiting for KasmVNC to be ready on port 8080..."
-for i in $(seq 1 60); do
+for i in $(seq 1 150); do
     if curl -sf --insecure https://localhost:8080 -o /dev/null 2>/dev/null || \
        curl -sf http://localhost:8080 -o /dev/null 2>/dev/null; then
         echo "KasmVNC is ready after ${i} attempts."
         break
     fi
-    if [ "$i" -eq 60 ]; then
-        echo "ERROR: KasmVNC did not start within 60 seconds."
+    if [ "$i" -eq 150 ]; then
+        echo "ERROR: KasmVNC did not start within 300 seconds."
+        echo "--- vncserver log ---"
+        cat /tmp/vncserver.log 2>/dev/null || echo "(no log)"
+        echo "--- processes ---"
+        ps aux | grep -E "vnc|xfce|idea" || true
+        echo "--- port 8080 ---"
+        ss -tlnp 2>/dev/null | grep 8080 || true
         exit 1
     fi
     sleep 2
