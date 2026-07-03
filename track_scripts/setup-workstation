@@ -5,43 +5,16 @@ export DISPLAY=:1
 export HOME=/root
 export XFCE_ALLOW_ROOT=1
 
-# Install VNC tools if not present (Instruqt provides display :1)
-if ! command -v x11vnc >/dev/null 2>&1; then
-    echo "deb http://archive.ubuntu.com/ubuntu jammy universe" >> /etc/apt/sources.list
-    apt-get update -qq
-    apt-get install -y -qq x11vnc
+# Instruqt provides VNC (port 5900) and noVNC (port 8080) automatically.
+# We just need XFCE and IntelliJ running on display :1.
+
+# Start XFCE if not already running
+if ! pgrep -x xfce4-session >/dev/null 2>&1; then
+    startxfce4 &
+    sleep 5
 fi
 
-if ! python3 -c "import websockify" 2>/dev/null; then
-    pip3 install --quiet websockify
-fi
-
-# Start XFCE desktop on the existing display :1
-startxfce4 &
-sleep 5
-
-# Start x11vnc to capture display :1
-x11vnc -display :1 -forever -nopw -listen 127.0.0.1 -rfbport 5900 -quiet &
-sleep 2
-
-# Start noVNC websocket proxy on port 8080
-NOVNC_WEB=/usr/share/novnc
-python3 -m websockify --web="$NOVNC_WEB" 8080 127.0.0.1:5900 &
-
-echo "Waiting for noVNC on port 8080..."
-for i in $(seq 1 60); do
-    if curl -sf http://localhost:8080 -o /dev/null 2>/dev/null; then
-        echo "Desktop ready after ${i} attempts."
-        break
-    fi
-    if [ "$i" -eq 60 ]; then
-        echo "ERROR: Desktop did not start within 120 seconds."
-        exit 1
-    fi
-    sleep 2
-done
-
-# Launch IntelliJ IDEA in background
+# Launch IntelliJ IDEA
 IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
 if [ -n "$IDEA_BIN" ]; then
     nohup "$IDEA_BIN" /workspace/task_tracker >/tmp/idea.log 2>&1 &

@@ -3,7 +3,8 @@ containers:
 - name: workstation
   image: hrushikeshkanade/jetbrains-instruqt:latest
   ports:
-  - 8080
+  - port: 8080
+    path: /vnc_auto.html
   memory: 8192
   cpus: 4
   environment:
