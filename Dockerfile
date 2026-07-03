@@ -49,6 +49,15 @@ RUN cd /workspace/task_tracker && \
     git add . && \
     git commit -m "Initial commit: task_tracker project"
 
+# Pre-accept JetBrains license, disable data sharing, trust /workspace
+RUN mkdir -p /root/.config/JetBrains/IdeaIC2024.1 && \
+    printf '[accepted]\neua=1.0\n' > /root/.config/JetBrains/IdeaIC2024.1/accepted_eua && \
+    mkdir -p /root/.local/share/JetBrains/consentOptions && \
+    echo "rsch:1.1:0:$(date +%s%3N)" > /root/.local/share/JetBrains/consentOptions/accepted && \
+    mkdir -p /root/.config/JetBrains/IdeaIC2024.1/options && \
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<application>\n  <component name="TrustDialogState">\n    <option name="approvedPaths">\n      <set>\n        <option value="/workspace" />\n      </set>\n    </option>\n  </component>\n</application>\n' \
+        > /root/.config/JetBrains/IdeaIC2024.1/options/ide.trust.project.xml
+
 # Copy startup script
 COPY docker/startup.sh /startup.sh
 RUN chmod +x /startup.sh
