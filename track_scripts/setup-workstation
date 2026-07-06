@@ -35,8 +35,8 @@ if [ -n "$IDEA_DIR" ]; then
     printf -- "-Xmx2048m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n" > "$IDEA_CFG/idea64.vmoptions"
 fi
 
-# Disable codeWithMe plugin — causes EDT crash on first launch in containers
-printf "com.jetbrains.codeWithMe\n" > "$IDEA_CFG/disabled_plugins.txt"
+# Disable codeWithMe (EDT crash in containers) and AI Assistant (not needed for this track)
+printf "com.jetbrains.codeWithMe\ncom.intellij.ml.llm\n" > "$IDEA_CFG/disabled_plugins.txt"
 
 if ! command -v xdotool >/dev/null 2>&1; then
     apt-get update -q >/tmp/apt-update.log 2>&1 || true
