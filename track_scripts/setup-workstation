@@ -5,17 +5,50 @@ export DISPLAY=:1
 export HOME=/root
 export XFCE_ALLOW_ROOT=1
 
-IDEA_CFG="/root/.config/JetBrains/IdeaIC2024.1"
-IDEA_DIR=$(ls -d /opt/idea-IC-*/ 2>/dev/null | head -1)
+IDEA_CFG="/root/.config/JetBrains/IntelliJIdea2025.3"
+IDEA_DIR="/opt/intellij-idea"
 mkdir -p "$IDEA_CFG/options" /root/.local/share/JetBrains/consentOptions
 
-# EULA — properties format required by IntelliJ 2024.1 (plain "1.0" is wrong)
+# EULA — properties format required by IntelliJ (plain "1.0" is wrong)
 printf '[accepted]\neua=1.0\n' > "$IDEA_CFG/accepted_eua"
 
 # Data sharing consent — real timestamp required (timestamp=0 causes dialog to reappear)
 printf "rsch:1.1:0:%s\n" "$(date +%s%3N)" > /root/.local/share/JetBrains/consentOptions/accepted
 
-# Trusted paths — correct component name is TrustedPaths (not Trusted.Paths)
+# Second, independent EULA/privacy bypass via the Java Preferences entry
+# IntelliJ 2024.2+ actually reads (the accepted_eua file above is the legacy
+# mechanism). Layering both means a future IDE version bump degrades
+# gracefully instead of silently reintroducing a manual click-through.
+mkdir -p /root/.java/.userPrefs/jetbrains/privacy_policy
+cat > /root/.java/.userPrefs/jetbrains/privacy_policy/prefs.xml <<'EOF'
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">
+<map MAP_XML_VERSION="1.0">
+  <entry key="accepted_version" value="1.1"/>
+  <entry key="eap_accepted_version" value="1.1"/>
+</map>
+EOF
+
+# Suppress first-run wizard, tips, and new-project confirmation dialogs
+cat > "$IDEA_CFG/options/other.xml" <<'EOF'
+<application>
+  <component name="GeneralSettings">
+    <option name="showTipsOnStartup" value="false" />
+    <option name="confirmOpenNewProject2" value="OPEN" />
+    <option name="reopenLastProject" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="ide.firstStartup" value="false" />
+    <property name="jb.privacy.accepted" value="true" />
+    <property name="idea.initially.ask.config" value="false" />
+  </component>
+</application>
+EOF
+
+# Trusted paths — correct component name is TrustedPaths (not Trusted.Paths).
+# This is a bypass the reference JetBrains-provided config in this org does
+# NOT include, which is why that other track needs a manual "Trust Project"
+# click on first launch — keep this one.
 cat > "$IDEA_CFG/options/trusted-paths.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <application>
@@ -30,24 +63,21 @@ cat > "$IDEA_CFG/options/trusted-paths.xml" <<'EOF'
 EOF
 
 if [ -n "$IDEA_DIR" ]; then
-    grep -q "ide.firstLaunch" "${IDEA_DIR}bin/idea.properties" 2>/dev/null || \
-        printf "\nide.firstLaunch=false\nidea.privacy.accepted=true\n" >> "${IDEA_DIR}bin/idea.properties"
-    printf -- "-Xmx2048m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n" > "$IDEA_CFG/idea64.vmoptions"
+    grep -q "ide.firstLaunch" "${IDEA_DIR}/bin/idea.properties" 2>/dev/null || \
+        printf "\nide.firstLaunch=false\nidea.privacy.accepted=true\n" >> "${IDEA_DIR}/bin/idea.properties"
+    # JCEF sandbox disabled: chrome-sandbox requires root:root 4755, which
+    # breaks under the root user this container runs as (JetBrains IJPL-59368).
+    printf -- "-Xms512m\n-Xmx3072m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n-Dide.browser.jcef.sandbox.enable=false\n" > "$IDEA_CFG/idea64.vmoptions"
 fi
 
-# Disable codeWithMe (EDT crash in containers) and AI Assistant (not needed for this track)
+# Disable codeWithMe (EDT crash in containers) and AI Assistant — this track
+# is built entirely around IntelliJ's own tooling, not AI features.
 printf "com.jetbrains.codeWithMe\ncom.intellij.ml.llm\n" > "$IDEA_CFG/disabled_plugins.txt"
 
 if ! command -v xdotool >/dev/null 2>&1; then
     apt-get update -q >/tmp/apt-update.log 2>&1 || true
     apt-get install -y -q xdotool >/tmp/xdotool-install.log 2>&1 || true
 fi
-
-cat > /usr/share/novnc/index.html <<'EOF'
-<!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0; url=vnc_auto.html"></head>
-<body>Redirecting...</body></html>
-EOF
 
 if ! pgrep -x xfce4-session >/dev/null 2>&1; then
     startxfce4 &
@@ -63,14 +93,16 @@ if [ -n "$XFCE_PID" ]; then
     fi
 fi
 
-IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
-if [ -n "$IDEA_BIN" ]; then
+IDEA_BIN="${IDEA_DIR}/bin/idea"
+if [ -x "$IDEA_BIN" ]; then
     nohup "$IDEA_BIN" /workspace/task_tracker >/tmp/idea.log 2>&1 &
     echo "IntelliJ IDEA launched."
 fi
 
 # Background dialog handler — keyboard-only, NO xdotool mouse clicks.
-# xdotool mousemove/click corrupts x11vnc's button tracking state, freezing VNC input.
+# Synthetic mouse events (xdotool mousemove/click) have previously corrupted
+# the VNC backend's button-tracking state and frozen input in this sandbox;
+# kept keyboard-only as a precaution across VNC backends.
 # wmctrl -a activates via EWMH (WM-native, safe); xdotool key sends keystrokes only.
 (
     export DISPLAY=:1
@@ -105,19 +137,24 @@ fi
     done
     [ $SF_ELAPSED -ge 30 ] && echo "$(date): Start Failed not seen (good)" >> /tmp/dialog-handler.log || true
 
-    # 1. Trust and Open Project — focus by ID (wmctrl -a needs exact title, unreliable)
-    WIN=$(wait_for_window "Trust and Open Project" 60) && {
+    # 1. Trust and Open Project — focus by ID (wmctrl -a needs exact title, unreliable).
+    #    Config-file bypass (trusted-paths.xml) should make this a no-op; this loop
+    #    is only the fallback if that bypass doesn't hold on a future IDE version.
+    #    Title alternation covers wording JetBrains has used across versions.
+    WIN=$(wait_for_window "Trust and Open Project|Trust This Project|Trust Project" 60) && {
         xdotool windowactivate "$WIN" 2>/dev/null || true
         sleep 0.8
         xdotool key --clearmodifiers Return
         echo "$(date): Trust dialog: Return pressed (win $WIN)" >> /tmp/dialog-handler.log
         sleep 3
-    } || echo "$(date): Trust not seen" >> /tmp/dialog-handler.log
+    } || echo "$(date): Trust not seen (expected — trusted-paths.xml should suppress it)" >> /tmp/dialog-handler.log
 
     # 2. EULA — keyboard only (no mouse = no XTest button events = no state corruption).
     #    Tab order: ScrollPane → Exit (Continue disabled, skipped) → checkbox.
     #    Tab Tab → checkbox, Space → check it, Tab → Continue (now enabled), Space → click.
-    WIN=$(wait_for_window "User Agreement" 60) && {
+    #    Config-file bypass (accepted_eua + privacy_policy prefs.xml) should make this
+    #    a no-op too; title alternation covers wording used across IDE versions.
+    WIN=$(wait_for_window "User Agreement|License Agreement|Privacy Policy" 60) && {
         xdotool windowactivate "$WIN" 2>/dev/null || true
         sleep 0.8
         xdotool key --clearmodifiers Tab Tab space
@@ -125,18 +162,74 @@ fi
         xdotool key --clearmodifiers Tab space
         echo "$(date): EULA dismissed via keyboard (win $WIN)" >> /tmp/dialog-handler.log
         sleep 2
-    } || echo "$(date): EULA not seen" >> /tmp/dialog-handler.log
+    } || echo "$(date): EULA not seen (expected — config bypass should suppress it)" >> /tmp/dialog-handler.log
 
     # 3. Data Sharing — WM_DELETE = "Don't Send" (no mouse needed)
-    WIN=$(wait_for_window "Data Sharing" 60) && {
+    WIN=$(wait_for_window "Data Sharing|Send Usage Statistics|Share.*Data" 60) && {
         xdotool windowclose "$WIN" 2>/dev/null || true
         echo "$(date): Data Sharing closed" >> /tmp/dialog-handler.log
-    } || echo "$(date): Data Sharing not seen" >> /tmp/dialog-handler.log
+    } || echo "$(date): Data Sharing not seen (expected — config bypass should suppress it)" >> /tmp/dialog-handler.log
 
-    # No x11vnc restart needed — keyboard-only dialog handler leaves no mouse state corruption.
+    # 4. Diagnostic sweep — log any other top-level window still open after the
+    #    known dialogs are handled. If a future IDE version introduces a new
+    #    unexpected popup, this makes it visible in the log instead of silently
+    #    leaving the learner staring at a blocked IDE with no clue why.
+    sleep 3
+    REMAINING=$(wmctrl -l 2>/dev/null | grep -v -iE "task_tracker|tasks\.py|main\.py|idea|xfce|panel|desktop" || true)
+    if [ -n "$REMAINING" ]; then
+        echo "$(date): unexpected window(s) still open after dialog handling:" >> /tmp/dialog-handler.log
+        echo "$REMAINING" >> /tmp/dialog-handler.log
+    fi
+
     echo "$(date): dialog handler complete" >> /tmp/dialog-handler.log
 
 ) >> /tmp/dialog-handler.log 2>&1 &
 
+# ─── Verification ────────────────────────────────────────────────────────────
+# Fail loudly here instead of leaving a broken sandbox for the learner to
+# discover silently.
+
+echo "--- track setup verification ---"
+
+MAX_WAIT=60
+WAITED=0
+until curl -s --max-time 5 --insecure "https://localhost:8080" -o /dev/null 2>/dev/null; do
+    if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+        echo "FAIL: KasmVNC not responding on :8080 within ${MAX_WAIT}s" >&2
+        exit 1
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+done
+echo "PASS: KasmVNC :8080"
+
+MAX_WAIT=120
+WAITED=0
+until pgrep -f "${IDEA_DIR}" >/dev/null 2>&1; do
+    if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+        echo "FAIL: IntelliJ IDEA did not start within ${MAX_WAIT}s" >&2
+        exit 1
+    fi
+    sleep 3
+    WAITED=$((WAITED + 3))
+done
+echo "PASS: IntelliJ IDEA process"
+
+python3 -m pytest --version >/dev/null 2>&1 \
+    || { echo "FAIL: pytest not available" >&2; exit 1; }
+echo "PASS: pytest available"
+
+python3 - << 'PYCHECK'
+import sys
+sys.path.insert(0, '/workspace/task_tracker')
+from tasks import add_task, complete_task
+print("PASS: tasks.py importable (add_task, complete_task)")
+PYCHECK
+
+git -C /workspace/task_tracker log --oneline -1 >/dev/null 2>&1 \
+    || { echo "FAIL: task_tracker git repo not initialised" >&2; exit 1; }
+echo "PASS: git repo initialised"
+
+echo "Track setup complete."
 echo "Track environment ready."
 exit 0

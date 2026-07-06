@@ -16,18 +16,24 @@ notes:
     - Renamed a parameter using IntelliJ's Rename refactoring (Shift+F6) — with every reference updated automatically
     - Set a breakpoint and run the debugger to inspect variable values at runtime
     - Committed the changes with a descriptive message
+    - Recovered an uncommitted edit using Local History — no git commit required
 tabs:
 - id: qwg364re0lly
   title: IDE Desktop
   type: service
   hostname: workstation
+  path: /?password=instruqt&autoconnect=true&resize=scale
   port: 8080
+  protocol: https
+  custom_request_headers:
+  - key: Authorization
+    value: Basic cm9vdDppbnN0cnVxdA==
 - id: yn1kndxovqxm
   title: Terminal
   type: terminal
   hostname: workstation
 difficulty: intermediate
-timelimit: 1200
+timelimit: 1500
 enhanced_loading: null
 ---
 
@@ -111,7 +117,17 @@ A red circle appears — this is a breakpoint. Execution will pause here wheneve
 
 At the top of the IDE, click the **Debug button** (green bug icon, next to the Run button), or press `Shift+F9`.
 
+> [!TIP]
+> `Shift+F9`, `F8`, and `F9` all reach the IDE fine in this sandbox — they're not intercepted by the browser. If a press seems to do nothing, click once inside the editor first so focus is on the remote session.
+
 IntelliJ runs the configured `task_tracker` script in debug mode. Execution pauses at the breakpoint inside `add_task`.
+
+<details>
+<summary>Hint: Execution doesn't pause at the breakpoint</summary>
+
+Double-check the red circle is on the exact line `task = {` inside `add_task`, not on a blank line or a different function. Also confirm you used the **Debug** button (bug icon) and not **Run** — breakpoints are ignored in a normal run.
+
+</details>
 
 The **Debug tool window** opens at the bottom. In the **Variables** panel, inspect:
 - `title` — the task title passed in
@@ -147,6 +163,35 @@ cd /workspace/task_tracker && \
 
 ---
 
+## Step 9 — Recover an Edit with Local History
+
+Committing isn't the only safety net IntelliJ gives you — it also keeps a **Local History** of every save, independent of git. This matters most for the mistake git can't help with: an edit you made before you ever committed it.
+
+In `tasks.py`, add a throwaway line at the very top of the file:
+
+```python,copy
+# TEMP: accidental edit
+```
+
+Save the file (`Ctrl+S`).
+
+Now recover from it as if you'd closed the IDE and lost your undo history: right-click anywhere in the editor and select **Local History > Show History**. In the timeline on the left, pick the revision from just before you added the line, then right-click it and choose **Revert Selection**.
+
+<details>
+<summary>Hint: "Local History" isn't in the right-click menu</summary>
+
+Make sure you're right-clicking inside the editor pane itself (not the Project tool window). If it's still missing, use **VCS > Local History > Show History** from the menu bar instead.
+
+</details>
+
+Confirm the throwaway line is gone:
+
+```bash,run
+cd /workspace/task_tracker && ! grep -q "TEMP: accidental edit" tasks.py && touch /tmp/c3-s9
+```
+
+---
+
 ## What You Used
 
 | Feature | Shortcut | What it did |
@@ -155,6 +200,7 @@ cd /workspace/task_tracker && \
 | Debug mode | Shift+F9 | Ran the program and paused at the breakpoint |
 | Step Over | F8 | Moved one line at a time through execution |
 | Resume | F9 | Continued to end of program |
+| Local History | — | Recovered an edit git never saw, with no commit required |
 
 This is IntelliJ IDEA running in a browser — no local install, no configuration, no account. The same full IDE your developers use on their machines.
 

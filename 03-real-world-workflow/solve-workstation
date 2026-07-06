@@ -35,3 +35,7 @@ if [ "$COMMIT_COUNT" -le 1 ]; then
 fi
 
 touch /tmp/c3-s8
+
+# Step 9: tasks.py never had the throwaway line in this solve path, so the
+# "reverted" end state is already satisfied — just mark it done.
+touch /tmp/c3-s9

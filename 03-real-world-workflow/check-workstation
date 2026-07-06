@@ -59,3 +59,13 @@ if [ ! -f /tmp/c3-s8 ]; then
     fail-message "Step 8 marker missing. Run: touch /tmp/c3-s8 after committing."
     exit 1
 fi
+
+if grep -q "TEMP: accidental edit" tasks.py 2>/dev/null; then
+    fail-message "tasks.py still contains the throwaway '# TEMP: accidental edit' line. Use Local History > Show History in the editor to revert it, then re-run the Step 9 verification command."
+    exit 1
+fi
+
+if [ ! -f /tmp/c3-s9 ]; then
+    fail-message "Step 9 not complete. After reverting the throwaway line via Local History, run: cd /workspace/task_tracker && ! grep -q \"TEMP: accidental edit\" tasks.py && touch /tmp/c3-s9"
+    exit 1
+fi

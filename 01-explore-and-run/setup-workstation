@@ -5,6 +5,6 @@ test -d /workspace/task_tracker
 test -f /workspace/task_tracker/tasks.py
 
 # Reset completion artifacts
-rm -f /workspace/task_tracker/.run_done /tmp/c1-s5 /tmp/c1-s6
+rm -f /workspace/task_tracker/.run_done /tmp/c1-s3 /tmp/c1-s6 /tmp/c1-s7
 
 echo "Challenge 1 setup complete."

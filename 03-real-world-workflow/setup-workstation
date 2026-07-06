@@ -147,6 +147,11 @@ fi
 rm -f /workspace/task_tracker/.explain_done
 
 # ---------------------------------------------------------------------------
+# Remove leftover Local History throwaway line from a prior attempt (Step 9)
+# ---------------------------------------------------------------------------
+sed -i '/# TEMP: accidental edit/d' /workspace/task_tracker/tasks.py
+
+# ---------------------------------------------------------------------------
 # Verification tail: assert every "Provided by: this challenge" capability
 # is functional before the learner starts
 # ---------------------------------------------------------------------------
@@ -185,6 +190,12 @@ git -C /workspace/task_tracker diff --cached --quiet || {
 # Explanation marker absent (learner must create it)
 [ ! -f /workspace/task_tracker/.explain_done ] || {
   echo "SETUP ERROR: .explain_done should not exist at challenge start" >&2
+  exit 1
+}
+
+# Local History throwaway line absent (learner must add and revert it fresh)
+! grep -q "TEMP: accidental edit" /workspace/task_tracker/tasks.py || {
+  echo "SETUP ERROR: leftover '# TEMP: accidental edit' line in tasks.py" >&2
   exit 1
 }
 

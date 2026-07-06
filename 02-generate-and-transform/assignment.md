@@ -21,7 +21,12 @@ tabs:
   title: IDE Desktop
   type: service
   hostname: workstation
+  path: /?password=instruqt&autoconnect=true&resize=scale
   port: 8080
+  protocol: https
+  custom_request_headers:
+  - key: Authorization
+    value: Basic cm9vdDppbnN0cnVxdA==
 - id: 7arnmsji6wen
   title: Terminal
   type: terminal
@@ -64,6 +69,13 @@ Press `Alt+Enter` (Windows/Linux) or `Option+Return` (macOS).
 A context menu of **Intention Actions** appears. These are IntelliJ's suggestions for the current line — they can range from quick-fixes to refactoring shortcuts.
 
 Look for **"Add docstring"** or **"Insert documentation string stub"** and select it.
+
+<details>
+<summary>Hint: No docstring option appears in the Alt+Enter menu</summary>
+
+Make sure your cursor is on the `def sort_tasks_by_due_date` line itself, not on a blank line above or below it. Intention Actions are context-sensitive to the exact line your cursor is on.
+
+</details>
 
 IntelliJ inserts a docstring template immediately below the `def` line. Fill in a one-line description:
 
@@ -129,6 +141,9 @@ print('filter_tasks_by_priority works correctly')
 
 Switch back to the **IDE Desktop** tab. In `tasks.py`, right-click on the `add_task` function name and select **Find Usages** (or press `Alt+F7`).
 
+> [!TIP]
+> If `Alt+F7` doesn't respond, click once inside the editor first — the keystroke needs to reach the remote IDE session, not the browser tab. The right-click menu option always works as a fallback.
+
 IntelliJ shows every place `add_task` is referenced in the project. This is IntelliJ's deep code understanding at work — not a text search, but a semantic analysis of actual call sites.
 
 ```bash,run
@@ -142,5 +157,7 @@ touch /tmp/c2-s6
 - **Alt+Enter** — IntelliJ's universal shortcut for Intention Actions and quick-fixes
 - **Code completion** — context-aware suggestions that read your comments as specifications
 - **Find Usages** — semantic reference search across the whole project
+
+In the next challenge you'll rename a parameter consistently across a function with Shift+F6, then set a breakpoint and step through execution in the debugger.
 
 Click **Check** to continue.

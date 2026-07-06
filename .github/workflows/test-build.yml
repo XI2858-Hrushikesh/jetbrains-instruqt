@@ -1,0 +1,96 @@
+name: Build and Smoke Test (no push)
+
+# Validates the Docker image without touching Docker Hub. Push to any branch
+# other than main to trigger this — main is reserved for build-and-push.yml,
+# which auto-deploys to the real :latest tag.
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'Dockerfile'
+      - 'docker/**'
+      - 'track_scripts/**'
+      - '**/setup-workstation'
+      - '**/check-workstation'
+      - '**/solve-workstation'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build image (local only, not pushed)
+        run: docker build -t jetbrains-instruqt-test .
+
+      - name: Start container
+        run: docker run -d --name jb-test -p 8080:8080 jetbrains-instruqt-test
+
+      - name: Wait for KasmVNC on :8080
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sk --max-time 5 https://localhost:8080 -o /dev/null; then
+              echo "KasmVNC responding"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "KasmVNC never came up" >&2
+          docker logs jb-test
+          exit 1
+
+      - name: Run track-level setup-workstation (simulates the Instruqt lifecycle step)
+        # This is the script with the EULA/trust-dialog bypass and the keyboard-only
+        # dialog handler — running it here exercises that logic against the real
+        # IDEA 2025.3 UI, which is exactly what's unverified without this CI run.
+        run: |
+          docker cp track_scripts/setup-workstation jb-test:/tmp/track-setup-workstation
+          docker exec jb-test bash /tmp/track-setup-workstation
+
+      - name: Dump dialog handler log (always, even on failure)
+        if: always()
+        run: docker exec jb-test cat /tmp/dialog-handler.log || echo "no dialog-handler.log found"
+
+      - name: Dump IDEA startup log (always, even on failure)
+        if: always()
+        run: docker exec jb-test cat /tmp/idea-startup.log /tmp/idea.log 2>/dev/null || true
+
+      - name: Run each challenge's check-workstation before/after solve-workstation
+        run: |
+          set -e
+          for ch in 01-explore-and-run 02-generate-and-transform 03-real-world-workflow; do
+            echo "=== $ch ==="
+
+            if [ -f "$ch/setup-workstation" ]; then
+              docker cp "$ch/setup-workstation" "jb-test:/tmp/ch-setup"
+              docker exec jb-test bash /tmp/ch-setup
+            fi
+
+            docker cp "$ch/check-workstation" "jb-test:/tmp/ch-check"
+            docker cp "$ch/solve-workstation" "jb-test:/tmp/ch-solve"
+
+            echo "-- check before solve (expect FAIL) --"
+            if docker exec jb-test bash -c '
+              fail-message() { echo "FAIL-MESSAGE: $*" >&2; }
+              export -f fail-message
+              bash /tmp/ch-check'; then
+              echo "UNEXPECTED: check-workstation passed before solve-workstation ran for $ch" >&2
+              exit 1
+            fi
+
+            echo "-- running solve-workstation --"
+            docker exec jb-test bash /tmp/ch-solve
+
+            echo "-- check after solve (expect PASS) --"
+            docker exec jb-test bash -c '
+              fail-message() { echo "FAIL-MESSAGE: $*" >&2; }
+              export -f fail-message
+              bash /tmp/ch-check'
+          done
+
+      - name: Container logs (always, even on failure)
+        if: always()
+        run: docker logs jb-test

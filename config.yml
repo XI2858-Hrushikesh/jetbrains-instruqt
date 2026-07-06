@@ -4,7 +4,7 @@ containers:
   image: hrushikeshkanade/jetbrains-instruqt:latest
   ports:
   - 8080
-  memory: 8192
+  memory: 12288
   cpus: 4
   environment:
     DISPLAY: ":1"

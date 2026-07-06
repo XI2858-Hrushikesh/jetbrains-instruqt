@@ -5,14 +5,18 @@ title: Get Started with JetBrains IntelliJ IDEA
 teaser: Run IntelliJ IDEA Community in a browser-based sandbox — no install, no account.
   Open a Python project, use smart Intention Actions to fix and implement code, then
   refactor with Shift+F6 and step through the debugger.
-description: |-
-  Run IntelliJ IDEA Community Edition in a browser-based sandbox and experience developer productivity hands-on. Open a Python project, run it from the IDE, use Intention Actions (Alt+Enter) to implement a function from a comment and add docstrings, then rename a parameter consistently across a function using Shift+F6 refactoring, set a breakpoint, and step through execution in the debugger. No local install, no JetBrains account, no sign-up required.
+description: Run IntelliJ IDEA Community Edition in a browser-based sandbox and experience
+  developer productivity hands-on. Open a Python project, run it from the IDE, use
+  Intention Actions (Alt+Enter) to implement a function from a comment and add docstrings,
+  then rename a parameter consistently across a function using Shift+F6 refactoring,
+  set a breakpoint, and step through execution in the debugger. No AI features involved
+  anywhere in this track — no local install, no JetBrains account, no sign-up required.
 icon: https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg
 level: beginner
 tags:
 - owner-email:tyler@instruqt.com
 - persona:developer
-- product:ai-assistant
+- product:intellij-idea
 owner: instruqt-support
 developers:
 - hrushikesh@instruqt.com
@@ -30,5 +34,5 @@ lab_config:
   hideStopButton: false
   default_layout: AssignmentRight
   default_layout_sidebar_size: 40
-checksum: "7756977939472866294"
+checksum: "7921460374882026422"
 enhanced_loading: false

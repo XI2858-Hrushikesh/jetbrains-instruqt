@@ -1,52 +1,40 @@
 #!/bin/bash
-# Starts Xvfb + XFCE + x11vnc + noVNC inside the container.
+# Starts KasmVNC (Xvnc + XFCE + built-in HTTPS websocket proxy) inside the
+# container, then launches IntelliJ IDEA against the sample project.
 
-export DISPLAY=:1
-export HOME=/root
-export USER=root
-export XFCE_ALLOW_ROOT=1
+set -uo pipefail
 
-# Start virtual framebuffer
-Xvfb :1 -screen 0 1920x1080x24 >/dev/null 2>&1 &
-sleep 3
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
 
-# Start XFCE desktop
-startxfce4 >/dev/null 2>&1 &
-sleep 5
+vncserver :1 \
+    -depth    24 \
+    -geometry 1920x1080 \
+    -localhost no
 
-# Start x11vnc
-x11vnc -display :1 -forever -nopw -listen 127.0.0.1 -rfbport 5900 -quiet >/dev/null 2>&1 &
-sleep 2
-
-# Find noVNC web root
-NOVNC_WEB=""
-for candidate in /usr/share/novnc /usr/share/novnc/web /opt/novnc; do
-    if [ -f "${candidate}/vnc.html" ] || [ -f "${candidate}/index.html" ]; then
-        NOVNC_WEB="$candidate"
-        break
+MAX_WAIT=60
+WAITED=0
+until curl -s --max-time 5 --insecure "https://localhost:8080" -o /dev/null 2>/dev/null; do
+    if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
+        echo "ERROR: KasmVNC did not come up on :8080 within ${MAX_WAIT}s" >&2
+        cat /root/.vnc/*.log 2>/dev/null | tail -30
+        exit 1
     fi
+    sleep 2
+    WAITED=$((WAITED + 2))
 done
-
-# Start websocket proxy on port 8080
-if [ -n "$NOVNC_WEB" ]; then
-    python3 -m websockify --web="$NOVNC_WEB" 8080 127.0.0.1:5900 >/dev/null 2>&1 &
-    echo "noVNC started with web root: $NOVNC_WEB"
-else
-    # Fallback: plain websockify without web files
-    python3 -m websockify 8080 127.0.0.1:5900 >/dev/null 2>&1 &
-    echo "websockify started (no web root found)"
-fi
+echo "KasmVNC is up on :8080"
 
 # Launch IntelliJ IDEA with the task_tracker project
-IDEA_BIN=$(ls /opt/idea-IC-*/bin/idea.sh 2>/dev/null | head -1)
-if [ -n "$IDEA_BIN" ]; then
-    "$IDEA_BIN" /workspace/task_tracker >/dev/null 2>&1 &
+export DISPLAY=:1
+IDEA_BIN=/opt/intellij-idea/bin/idea
+if [ -x "$IDEA_BIN" ]; then
+    nohup "$IDEA_BIN" nosplash /workspace/task_tracker >/tmp/idea-startup.log 2>&1 &
     echo "IntelliJ IDEA launched."
 else
-    echo "WARNING: IntelliJ IDEA binary not found." >&2
+    echo "WARNING: IntelliJ IDEA binary not found at $IDEA_BIN." >&2
 fi
 
-echo "Environment ready. noVNC on port 8080."
+echo "Environment ready. KasmVNC on port 8080."
 
 # Keep container alive
 tail -f /dev/null
