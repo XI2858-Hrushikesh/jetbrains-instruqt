@@ -129,6 +129,7 @@ fi
     export DISPLAY=:1
     ELAPSED=0
     MAX_TOTAL=180
+    EULA_LOGGED=0
 
     handle_start_failed() {
         local win
@@ -139,19 +140,25 @@ fi
         return 0
     }
 
+    # NOT auto-clicked. A previous version pressed Tab Tab Space (assumed:
+    # checkbox) then Tab Space (assumed: Continue) -- confirmed live via
+    # idea.log that this actually landed on the Decline/Exit button instead
+    # (com.intellij.ide.gdpr.AgreementUiBuilder.configureDeclineButton ->
+    # ApplicationImpl.exit()), silently quitting the entire IDE. Getting the
+    # tab order wrong here is catastrophic (no IDE at all) versus just
+    # annoying (one manual click), so this only detects and logs the dialog
+    # once rather than guessing at it again. The config-file bypass
+    # (accepted_eua + privacy_policy prefs.xml) is what should actually
+    # prevent this dialog from appearing in the first place.
     handle_eula() {
         local win
         win=$(xdotool search --name "User Agreement|License Agreement|Privacy Policy" 2>/dev/null | head -1) || true
         [ -z "$win" ] && return 1
-        xdotool windowactivate "$win" 2>/dev/null || true
-        sleep 0.8
-        # Tab order: ScrollPane -> Exit (Continue disabled, skipped) -> checkbox.
-        # Tab Tab -> checkbox, Space -> check it, Tab -> Continue (now enabled), Space -> click.
-        xdotool key --clearmodifiers Tab Tab space
-        sleep 0.3
-        xdotool key --clearmodifiers Tab space
-        echo "$(date): EULA dismissed via keyboard (win $win)" >> /tmp/dialog-handler.log
-        return 0
+        if [ "$EULA_LOGGED" -eq 0 ]; then
+            echo "$(date): EULA dialog present (win $win) -- config bypass did not suppress it. NOT auto-clicking (see comment above); needs a manual Accept." >> /tmp/dialog-handler.log
+            EULA_LOGGED=1
+        fi
+        return 1
     }
 
     handle_data_sharing() {

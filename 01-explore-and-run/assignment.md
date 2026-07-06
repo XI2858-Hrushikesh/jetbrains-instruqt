@@ -47,7 +47,7 @@ A full IntelliJ IDEA Community installation is running in this sandbox. The `tas
 Switch to the **IDE Desktop** tab.
 
 > [!NOTE]
-> When the IDE first opens, one or more setup dialogs (License Agreement, Data Sharing) may appear. They will be **automatically dismissed within 5–10 seconds** — the sandbox runs a background script that accepts the license and closes those dialogs for you. If you see a dialog, just wait a moment and it will close on its own.
+> When the IDE first opens, a **Data Sharing** and/or **Trust Project** dialog may briefly appear — the sandbox runs a background script that closes those for you within a couple of seconds. A **JetBrains User Agreement** dialog may also appear; that one needs one manual step since auto-accepting it isn't reliable — just check the confirmation checkbox and click **Continue**.
 
 > [!NOTE]
 > IntelliJ indexes the project on first launch. During indexing the IDE may feel slow or unresponsive — this is normal. Wait for the spinning progress indicator in the **status bar at the bottom** to finish before clicking around. Indexing typically takes 30–60 seconds.
