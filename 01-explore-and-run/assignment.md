@@ -80,7 +80,7 @@ Read through the file. It contains:
 
 Before wiring up a run configuration, get comfortable navigating without the Project tree.
 
-Press `Shift` twice quickly (**Search Everywhere**). Type `main.py` and press `Enter` to jump straight to it — this works for files, classes, functions, and even IDE settings from one box.
+Press `Shift` twice quickly (**Search Everywhere**). Type `add_task` and press `Enter` to jump straight to that function's definition — this box searches files, classes, functions, and even IDE settings all at once, not just filenames.
 
 With a file open, press `Alt+7` (Windows/Linux) or `Cmd+7` (macOS) to open the **Structure** tool window. This shortcut works no matter what the menu layout looks like — IntelliJ's New UI (the default here) doesn't show a classic File/Edit/View menu bar, so this is the reliable way in rather than hunting through a menu that isn't there.
 
