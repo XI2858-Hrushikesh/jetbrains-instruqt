@@ -32,7 +32,7 @@ EOF
 if [ -n "$IDEA_DIR" ]; then
     grep -q "ide.firstLaunch" "${IDEA_DIR}bin/idea.properties" 2>/dev/null || \
         printf "\nide.firstLaunch=false\nidea.privacy.accepted=true\n" >> "${IDEA_DIR}bin/idea.properties"
-    printf -- "-Xmx2048m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n" > "$IDEA_CFG/idea64.vmoptions"
+    printf -- "-Xmx2048m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n" > "$IDEA_CFG/idea64.vmoptions"
 fi
 
 # Disable codeWithMe (EDT crash in containers) and AI Assistant (not needed for this track)
