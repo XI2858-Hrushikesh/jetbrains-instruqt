@@ -94,7 +94,9 @@ if [ -n "$XFCE_PID" ]; then
 fi
 
 IDEA_BIN="${IDEA_DIR}/bin/idea"
-if [ -x "$IDEA_BIN" ]; then
+if pgrep -f "${IDEA_DIR}" >/dev/null 2>&1; then
+    echo "IntelliJ IDEA already running (launched by docker/startup.sh) — not launching a second instance."
+elif [ -x "$IDEA_BIN" ]; then
     nohup "$IDEA_BIN" /workspace/task_tracker >/tmp/idea.log 2>&1 &
     echo "IntelliJ IDEA launched."
 fi
@@ -191,9 +193,13 @@ fi
 
 echo "--- track setup verification ---"
 
+# Authenticated probe — an unauthenticated request here trips KasmVNC's
+# brute-force blacklist against 127.0.0.1 within a handful of attempts,
+# which then silently drops every later local request for the rest of
+# the container's life (this is what broke the first CI run).
 MAX_WAIT=60
 WAITED=0
-until curl -s --max-time 5 --insecure "https://localhost:8080" -o /dev/null 2>/dev/null; do
+until curl -s --max-time 5 --insecure -u root:instruqt "https://localhost:8080" -o /dev/null 2>/dev/null; do
     if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
         echo "FAIL: KasmVNC not responding on :8080 within ${MAX_WAIT}s" >&2
         exit 1
