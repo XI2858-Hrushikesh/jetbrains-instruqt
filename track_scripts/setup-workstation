@@ -78,7 +78,15 @@ if [ -n "$IDEA_DIR" ]; then
         printf "\nide.firstLaunch=false\nidea.privacy.accepted=true\n" >> "${IDEA_DIR}/bin/idea.properties"
     # JCEF sandbox disabled: chrome-sandbox requires root:root 4755, which
     # breaks under the root user this container runs as (JetBrains IJPL-59368).
-    printf -- "-Xms512m\n-Xmx3072m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n-Dide.browser.jcef.sandbox.enable=false\n" > "$IDEA_CFG/idea64.vmoptions"
+    # Short network timeouts: confirmed live that IDEA's main window never
+    # appeared for several minutes while idea-startup.log repeatedly logged
+    # "AIPromoWindowAdvisor - Verdict calculation took too long" every ~43s,
+    # with the process alive but using almost no CPU -- consistent with a
+    # startup-path network call (this sandbox has no route to JetBrains'
+    # license/AI servers) hanging on the default (long) socket timeout
+    # before the main window is created. Forcing short timeouts makes any
+    # such call fail fast instead of stalling the UI thread.
+    printf -- "-Xms512m\n-Xmx3072m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n-Dide.browser.jcef.sandbox.enable=false\n-Dsun.net.client.defaultConnectTimeout=3000\n-Dsun.net.client.defaultReadTimeout=3000\n" > "$IDEA_CFG/idea64.vmoptions"
 fi
 
 # Disable codeWithMe (EDT crash in containers) and AI Assistant — this track

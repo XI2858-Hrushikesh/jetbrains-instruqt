@@ -120,10 +120,17 @@ exec startxfce4
 XSTARTUP
 RUN chmod +x /root/.vnc/xstartup
 
-# JVM options — headroom for IDEA 2025.3's larger JBR runtime, and disable
+# JVM options — headroom for IDEA 2025.3's larger JBR runtime, disable
 # JCEF's sandbox (chrome-sandbox requires root:root 4755, which breaks under
-# the root user this container runs as — see JetBrains bug IJPL-59368).
-RUN printf -- "-Xms512m\n-Xmx3072m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n-Dide.browser.jcef.sandbox.enable=false\n" \
+# the root user this container runs as — see JetBrains bug IJPL-59368), and
+# force short network timeouts. Confirmed live: with default (long) socket
+# timeouts, IDEA's main window never appeared for several minutes while
+# idea-startup.log repeatedly logged "AIPromoWindowAdvisor - Verdict
+# calculation took too long" every ~43s, process alive but near-zero CPU —
+# consistent with a startup-path network call (no route to JetBrains'
+# license/AI servers from this sandbox) hanging before the main window is
+# created.
+RUN printf -- "-Xms512m\n-Xmx3072m\n-Dide.firstLaunch=false\n-Dide.slow.operations.assertion=false\n-Dsun.awt.disablegrab=true\n-Dide.browser.jcef.sandbox.enable=false\n-Dsun.net.client.defaultConnectTimeout=3000\n-Dsun.net.client.defaultReadTimeout=3000\n" \
     > /root/.config/JetBrains/IntelliJIdea2025.3/idea64.vmoptions
 
 # Disable codeWithMe (EDT crash in containers) and AI Assistant — this track
