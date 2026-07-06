@@ -114,22 +114,16 @@ fi
         sleep 3
     } || echo "$(date): Trust not seen" >> /tmp/dialog-handler.log
 
-    # 2. EULA — mouse clicks on checkbox then Continue button.
-    #    Focus starts on text pane (not checkbox), so keyboard Space+Return doesn't work.
-    #    _JAVA_AWT_WM_NONREPARENTING=1 removed so xfwm4 manages IntelliJ windows
-    #    normally; any transient x11vnc state from these clicks is fixed by the first
-    #    real user click, which now properly gives IntelliJ focus via click-to-focus.
+    # 2. EULA — keyboard only (no mouse = no XTest button events = no state corruption).
+    #    Tab order: ScrollPane → Exit (Continue disabled, skipped) → checkbox.
+    #    Tab Tab → checkbox, Space → check it, Tab → Continue (now enabled), Space → click.
     WIN=$(wait_for_window "User Agreement" 60) && {
-        xdotool windowraise "$WIN" 2>/dev/null || true
+        xdotool windowactivate "$WIN" 2>/dev/null || true
         sleep 0.8
-        xdotool mousemove --window "$WIN" --clearmodifiers 22 358
+        xdotool key --clearmodifiers Tab Tab space
         sleep 0.3
-        xdotool click --clearmodifiers 1
-        sleep 0.5
-        xdotool mousemove --window "$WIN" --clearmodifiers 505 404
-        sleep 0.3
-        xdotool click --clearmodifiers 1
-        echo "$(date): EULA dismissed via mouse (win $WIN)" >> /tmp/dialog-handler.log
+        xdotool key --clearmodifiers Tab space
+        echo "$(date): EULA dismissed via keyboard (win $WIN)" >> /tmp/dialog-handler.log
         sleep 2
     } || echo "$(date): EULA not seen" >> /tmp/dialog-handler.log
 
@@ -139,14 +133,7 @@ fi
         echo "$(date): Data Sharing closed" >> /tmp/dialog-handler.log
     } || echo "$(date): Data Sharing not seen" >> /tmp/dialog-handler.log
 
-    # 4. Restart x11vnc to clear button state corruption from xdotool mouse clicks.
-    #    noVNC auto-reconnects within 1-2 seconds. New x11vnc has fully clean state.
-    sleep 2
-    pkill -f x11vnc 2>/dev/null || true
-    sleep 1
-    DISPLAY=:1 x11vnc -display :1 -forever -nopw -listen 127.0.0.1 -rfbport 5900 -quiet >/dev/null 2>&1 &
-    echo "$(date): x11vnc restarted — clean state" >> /tmp/dialog-handler.log
-
+    # No x11vnc restart needed — keyboard-only dialog handler leaves no mouse state corruption.
     echo "$(date): dialog handler complete" >> /tmp/dialog-handler.log
 
 ) >> /tmp/dialog-handler.log 2>&1 &
