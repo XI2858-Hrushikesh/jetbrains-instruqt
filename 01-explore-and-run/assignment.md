@@ -82,7 +82,12 @@ Before wiring up a run configuration, get comfortable navigating without the Pro
 
 Press `Shift` twice quickly (**Search Everywhere**). Type `main.py` and press `Enter` to jump straight to it — this works for files, classes, functions, and even IDE settings from one box.
 
-With a file open, go to **View > Tool Windows > Structure** (or `Ctrl+F12` / `Cmd+F12` — reserved by most browsers as a dev-tools shortcut, so the menu path is the reliable option here). The **Structure** tool window lists every function in the current file in one place, useful for orienting in a file before reading it top to bottom.
+With a file open, press `Alt+7` (Windows/Linux) or `Cmd+7` (macOS) to open the **Structure** tool window. This shortcut works no matter what the menu layout looks like — IntelliJ's New UI (the default here) doesn't show a classic File/Edit/View menu bar, so this is the reliable way in rather than hunting through a menu that isn't there.
+
+> [!TIP]
+> If `Alt+7` doesn't respond, click once inside the editor first so the keystroke reaches the remote IDE session. If it still doesn't open, look for a **Structure** tab in the thin strip of tool window icons docked on the left or right edge of the IDE window and click it directly.
+
+The **Structure** tool window lists every function in the current file in one place, useful for orienting in a file before reading it top to bottom.
 
 ```bash,run
 touch /tmp/c1-s3
@@ -94,7 +99,7 @@ touch /tmp/c1-s3
 
 IntelliJ needs a run configuration to know how to execute the script.
 
-1. Click **Run > Edit Configurations** in the menu bar (or click the dropdown next to the Run button in the top toolbar and choose **Edit Configurations**).
+1. Click the **Current File** dropdown in the top toolbar (next to the run/debug icons) and choose **Edit Configurations**.
 2. Click the **+** button and select **Python**.
 3. Set:
    - **Name**: `task_tracker`
@@ -114,7 +119,7 @@ Click the **Run button** (green triangle) in the top toolbar, or press `Shift+F1
 <details>
 <summary>Hint: Run button is greyed out</summary>
 
-This usually means the run configuration from Step 4 wasn't saved. Reopen **Run > Edit Configurations** and confirm the `task_tracker` configuration is listed and selected in the dropdown next to the Run button, then try again.
+This usually means the run configuration from Step 4 wasn't saved. Reopen it via the **Current File** dropdown in the toolbar (or press `Ctrl+Shift+A` / `Cmd+Shift+A` for **Find Action** and type "Edit Configurations" — this search-by-name shortcut always works no matter what's visible in the toolbar) and confirm `task_tracker` is listed and selected, then try again.
 
 </details>
 

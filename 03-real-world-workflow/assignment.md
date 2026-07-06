@@ -180,7 +180,7 @@ Now recover from it as if you'd closed the IDE and lost your undo history: right
 <details>
 <summary>Hint: "Local History" isn't in the right-click menu</summary>
 
-Make sure you're right-clicking inside the editor pane itself (not the Project tool window). If it's still missing, use **VCS > Local History > Show History** from the menu bar instead.
+Make sure you're right-clicking inside the editor pane itself (not the Project tool window). If it's still missing, press `Ctrl+Shift+A` / `Cmd+Shift+A` for **Find Action** and type "Show History" — this search-by-name shortcut reaches every IDE action regardless of which menus are visible.
 
 </details>
 
