@@ -4,6 +4,20 @@
 
 set -uo pipefail
 
+# Block external DNS resolution entirely. Confirmed live: with normal DNS in
+# place, IntelliJ's main window failed to appear for several minutes while
+# idea-startup.log repeatedly logged "AIPromoWindowAdvisor - Verdict
+# calculation took too long" every ~43s on the dot -- a fixed interval like
+# that, recurring across independent runs, matches a network call that's
+# silently dropped (no response, no rejection) rather than actively refused,
+# so the client just sits until its own internal timeout expires. Forcing
+# sun.net.client.default*Timeout (an earlier attempt) had no effect, meaning
+# whatever HTTP client IntelliJ uses here ignores that JDK property. This
+# track has no legitimate need for external DNS at all (git, pytest, and the
+# IDE itself are all local) -- with no nameservers configured, any such
+# lookup fails in milliseconds instead of hanging.
+echo "nameserver 127.0.0.1" > /etc/resolv.conf
+
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
 
 vncserver :1 \
