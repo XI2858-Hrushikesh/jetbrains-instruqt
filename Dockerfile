@@ -66,9 +66,11 @@ RUN cd /workspace/task_tracker && \
 # the legacy accepted_eua properties file, and (since ~2024.2) a Java
 # Preferences entry under privacy_policy. Setting both means this survives
 # a future IDE version bump without silently regressing into a manual
-# click-through — the TrustedPaths bypass below (trust-dialog suppression)
-# is not something the reference JetBrains-provided config covers, so keep
-# it even though it isn't part of that layered pair.
+# click-through. The trust-path bypass below uses "Trusted.Paths.Settings"
+# (verified against a real working config) plus a per-project
+# "Trusted.Paths" map entry as a second, independent mechanism — an earlier
+# version used "TrustedPaths", a component IntelliJ never reads, which is
+# why the Trust dialog kept appearing despite the file being present.
 RUN mkdir -p /root/.config/JetBrains/IntelliJIdea2025.3/options && \
     printf '[accepted]\neua=1.0\n' > /root/.config/JetBrains/IntelliJIdea2025.3/accepted_eua && \
     mkdir -p /root/.local/share/JetBrains/consentOptions && \
@@ -76,7 +78,7 @@ RUN mkdir -p /root/.config/JetBrains/IntelliJIdea2025.3/options && \
     mkdir -p /root/.java/.userPrefs/jetbrains/privacy_policy && \
     printf '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">\n<map MAP_XML_VERSION="1.0">\n  <entry key="accepted_version" value="1.1"/>\n  <entry key="eap_accepted_version" value="1.1"/>\n</map>\n' \
         > /root/.java/.userPrefs/jetbrains/privacy_policy/prefs.xml && \
-    printf '<?xml version="1.0" encoding="UTF-8"?>\n<application>\n  <component name="TrustedPaths">\n    <option name="TRUSTED_PATHS">\n      <list>\n        <option value="/workspace" />\n      </list>\n    </option>\n  </component>\n</application>\n' \
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<application>\n  <component name="Trusted.Paths.Settings">\n    <option name="TRUSTED_PATHS">\n      <list>\n        <option value="/workspace" />\n      </list>\n    </option>\n  </component>\n  <component name="Trusted.Paths">\n    <option name="TRUSTED_PROJECT_PATHS">\n      <map>\n        <entry key="/workspace/task_tracker" value="true" />\n      </map>\n    </option>\n  </component>\n</application>\n' \
         > /root/.config/JetBrains/IntelliJIdea2025.3/options/trusted-paths.xml && \
     printf '<application>\n  <component name="GeneralSettings">\n    <option name="showTipsOnStartup" value="false" />\n    <option name="confirmOpenNewProject2" value="OPEN" />\n    <option name="reopenLastProject" value="true" />\n  </component>\n  <component name="PropertiesComponent">\n    <property name="ide.firstStartup" value="false" />\n    <property name="jb.privacy.accepted" value="true" />\n    <property name="idea.initially.ask.config" value="false" />\n  </component>\n</application>\n' \
         > /root/.config/JetBrains/IntelliJIdea2025.3/options/other.xml

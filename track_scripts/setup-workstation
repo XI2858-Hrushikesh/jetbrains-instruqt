@@ -45,18 +45,29 @@ cat > "$IDEA_CFG/options/other.xml" <<'EOF'
 </application>
 EOF
 
-# Trusted paths — correct component name is TrustedPaths (not Trusted.Paths).
+# Trusted paths — the actual component name is "Trusted.Paths.Settings"
+# (verified against a real working config; an earlier version of this file
+# used "TrustedPaths", a component IntelliJ never reads, so the Trust dialog
+# kept appearing despite the file being present). Also set the per-project
+# "Trusted.Paths" map entry as a second, independent bypass.
 # This is a bypass the reference JetBrains-provided config in this org does
 # NOT include, which is why that other track needs a manual "Trust Project"
 # click on first launch — keep this one.
 cat > "$IDEA_CFG/options/trusted-paths.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <application>
-  <component name="TrustedPaths">
+  <component name="Trusted.Paths.Settings">
     <option name="TRUSTED_PATHS">
       <list>
         <option value="/workspace" />
       </list>
+    </option>
+  </component>
+  <component name="Trusted.Paths">
+    <option name="TRUSTED_PROJECT_PATHS">
+      <map>
+        <entry key="/workspace/task_tracker" value="true" />
+      </map>
     </option>
   </component>
 </application>
@@ -105,78 +116,77 @@ fi
 # Synthetic mouse events (xdotool mousemove/click) have previously corrupted
 # the VNC backend's button-tracking state and frozen input in this sandbox;
 # kept keyboard-only as a precaution across VNC backends.
-# wmctrl -a activates via EWMH (WM-native, safe); xdotool key sends keystrokes only.
+#
+# Single concurrent polling loop, NOT sequential per-dialog waits: an earlier
+# version waited up to 60s for the Trust dialog first, then EULA, then Data
+# Sharing — but confirmed live, the real order is EULA -> Data Sharing ->
+# Trust. With sequential waits in the wrong order, a learner watching a
+# blocked IDE sees a dialog sitting untouched for up to a minute and just
+# clicks it manually before the script gets around to checking for it. This
+# loop checks for every known dialog every ~1s regardless of order, so
+# whichever appears first gets caught within a second or two.
 (
     export DISPLAY=:1
+    ELAPSED=0
+    MAX_TOTAL=180
 
-    wait_for_window() {
-        local title="$1"
-        local timeout="${2:-300}"
-        local elapsed=0
-        while [ $elapsed -lt $timeout ]; do
-            local win
-            win=$(xdotool search --name "$title" 2>/dev/null | head -1) || true
-            if [ -n "$win" ]; then
-                echo "$win"
-                return 0
-            fi
-            sleep 2
-            elapsed=$((elapsed + 2))
-        done
-        return 1
+    handle_start_failed() {
+        local win
+        win=$(xdotool search --name "Start Failed" 2>/dev/null | head -1) || true
+        [ -z "$win" ] && return 1
+        wmctrl -c "Start Failed" 2>/dev/null || true
+        echo "$(date): Start Failed closed (win $win)" >> /tmp/dialog-handler.log
+        return 0
     }
 
-    # 0. Start Failed — close via WM (30s max)
-    SF_ELAPSED=0
-    while [ $SF_ELAPSED -lt 30 ]; do
-        SF_WIN=$(xdotool search --name "Start Failed" 2>/dev/null | head -1) || true
-        if [ -n "$SF_WIN" ]; then
-            wmctrl -c "Start Failed" 2>/dev/null || true
-            echo "$(date): Start Failed closed" >> /tmp/dialog-handler.log
-            sleep 2; break
-        fi
-        sleep 2; SF_ELAPSED=$((SF_ELAPSED + 2))
-    done
-    [ $SF_ELAPSED -ge 30 ] && echo "$(date): Start Failed not seen (good)" >> /tmp/dialog-handler.log || true
-
-    # 1. Trust and Open Project — focus by ID (wmctrl -a needs exact title, unreliable).
-    #    Config-file bypass (trusted-paths.xml) should make this a no-op; this loop
-    #    is only the fallback if that bypass doesn't hold on a future IDE version.
-    #    Title alternation covers wording JetBrains has used across versions.
-    WIN=$(wait_for_window "Trust and Open Project|Trust This Project|Trust Project" 60) && {
-        xdotool windowactivate "$WIN" 2>/dev/null || true
+    handle_eula() {
+        local win
+        win=$(xdotool search --name "User Agreement|License Agreement|Privacy Policy" 2>/dev/null | head -1) || true
+        [ -z "$win" ] && return 1
+        xdotool windowactivate "$win" 2>/dev/null || true
         sleep 0.8
-        xdotool key --clearmodifiers Return
-        echo "$(date): Trust dialog: Return pressed (win $WIN)" >> /tmp/dialog-handler.log
-        sleep 3
-    } || echo "$(date): Trust not seen (expected — trusted-paths.xml should suppress it)" >> /tmp/dialog-handler.log
-
-    # 2. EULA — keyboard only (no mouse = no XTest button events = no state corruption).
-    #    Tab order: ScrollPane → Exit (Continue disabled, skipped) → checkbox.
-    #    Tab Tab → checkbox, Space → check it, Tab → Continue (now enabled), Space → click.
-    #    Config-file bypass (accepted_eua + privacy_policy prefs.xml) should make this
-    #    a no-op too; title alternation covers wording used across IDE versions.
-    WIN=$(wait_for_window "User Agreement|License Agreement|Privacy Policy" 60) && {
-        xdotool windowactivate "$WIN" 2>/dev/null || true
-        sleep 0.8
+        # Tab order: ScrollPane -> Exit (Continue disabled, skipped) -> checkbox.
+        # Tab Tab -> checkbox, Space -> check it, Tab -> Continue (now enabled), Space -> click.
         xdotool key --clearmodifiers Tab Tab space
         sleep 0.3
         xdotool key --clearmodifiers Tab space
-        echo "$(date): EULA dismissed via keyboard (win $WIN)" >> /tmp/dialog-handler.log
-        sleep 2
-    } || echo "$(date): EULA not seen (expected — config bypass should suppress it)" >> /tmp/dialog-handler.log
+        echo "$(date): EULA dismissed via keyboard (win $win)" >> /tmp/dialog-handler.log
+        return 0
+    }
 
-    # 3. Data Sharing — WM_DELETE = "Don't Send" (no mouse needed)
-    WIN=$(wait_for_window "Data Sharing|Send Usage Statistics|Share.*Data" 60) && {
-        xdotool windowclose "$WIN" 2>/dev/null || true
-        echo "$(date): Data Sharing closed" >> /tmp/dialog-handler.log
-    } || echo "$(date): Data Sharing not seen (expected — config bypass should suppress it)" >> /tmp/dialog-handler.log
+    handle_data_sharing() {
+        local win
+        win=$(xdotool search --name "Data Sharing|Send Usage Statistics|Share.*Data" 2>/dev/null | head -1) || true
+        [ -z "$win" ] && return 1
+        xdotool windowclose "$win" 2>/dev/null || true
+        echo "$(date): Data Sharing closed (win $win)" >> /tmp/dialog-handler.log
+        return 0
+    }
 
-    # 4. Diagnostic sweep — log any other top-level window still open after the
-    #    known dialogs are handled. If a future IDE version introduces a new
-    #    unexpected popup, this makes it visible in the log instead of silently
-    #    leaving the learner staring at a blocked IDE with no clue why.
-    sleep 3
+    handle_trust() {
+        local win
+        win=$(xdotool search --name "Trust and Open Project|Trust This Project|Trust Project" 2>/dev/null | head -1) || true
+        [ -z "$win" ] && return 1
+        xdotool windowactivate "$win" 2>/dev/null || true
+        sleep 0.8
+        xdotool key --clearmodifiers Return
+        echo "$(date): Trust dialog: Return pressed (win $win)" >> /tmp/dialog-handler.log
+        return 0
+    }
+
+    while [ $ELAPSED -lt $MAX_TOTAL ]; do
+        if handle_eula; then sleep 2; continue; fi
+        if handle_data_sharing; then sleep 1; continue; fi
+        if handle_trust; then sleep 2; continue; fi
+        if handle_start_failed; then sleep 1; continue; fi
+        sleep 1
+        ELAPSED=$((ELAPSED + 1))
+    done
+
+    # Diagnostic sweep — log any other top-level window still open after
+    # polling ends. If a future IDE version introduces a new unexpected
+    # popup, this makes it visible in the log instead of silently leaving
+    # the learner staring at a blocked IDE with no clue why.
     REMAINING=$(wmctrl -l 2>/dev/null | grep -v -iE "task_tracker|tasks\.py|main\.py|idea|xfce|panel|desktop" || true)
     if [ -n "$REMAINING" ]; then
         echo "$(date): unexpected window(s) still open after dialog handling:" >> /tmp/dialog-handler.log
