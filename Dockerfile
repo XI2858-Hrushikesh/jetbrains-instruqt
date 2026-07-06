@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # JetBrains IntelliJ IDEA + KasmVNC for Instruqt workshop
 # Build: docker build -t hrushikeshkanade/jetbrains-instruqt:latest .
 # Push:  docker push hrushikeshkanade/jetbrains-instruqt:latest
